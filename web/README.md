@@ -1,4 +1,4 @@
-# AGI-saber 前端（Vite + Vue 3）
+# KnowFlow 前端（Vite + Vue 3）
 
 前后端分离的前端工程。开发期用 Vite dev server（:5173）+ 代理到后端 :8090；
 生产期 `npm run build` 产出 `dist/`，由独立静态服务器 / nginx 托管。

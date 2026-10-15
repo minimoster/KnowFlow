@@ -1,4 +1,4 @@
-# AGI-Assistant Go Project Architecture Map
+# KnowFlow Go Project Architecture Map
 
 **Date:** 2026-06-10  
 **Go Version:** 1.23.0  

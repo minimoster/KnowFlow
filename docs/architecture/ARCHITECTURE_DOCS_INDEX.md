@@ -1,6 +1,6 @@
 # Architecture Documentation Index
 
-This file serves as a quick reference to the complete architectural analysis of the AGI Assistant codebase.
+This file serves as a quick reference to the complete architectural analysis of the KnowFlow codebase.
 
 ## 📖 Documents (Read in This Order)
 

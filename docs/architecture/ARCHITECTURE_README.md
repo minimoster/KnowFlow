@@ -1,4 +1,4 @@
-# AGI Assistant - Architecture Documentation
+# KnowFlow - Architecture Documentation
 
 This directory contains architecture documents describing the current codebase, RAG ingestion flow, and refactoring roadmap.
 

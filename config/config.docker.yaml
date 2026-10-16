@@ -2,6 +2,8 @@
 # 容器内 DNS 自动解析（localhost 在容器内指容器自己，不可用）。
 # 本地 go run 时仍用 config/config.yaml（localhost）。
 llm:
+  # real 为默认；仅演示/离线测试显式设置 mock。缺少凭据会报错。
+  mode: real
   api_url: https://open.bigmodel.cn/api/paas/v4/chat/completions
   api_key: "."
   model: glm-5.2

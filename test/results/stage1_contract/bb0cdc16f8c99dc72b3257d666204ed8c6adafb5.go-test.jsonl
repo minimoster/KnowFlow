@@ -1,0 +1,44 @@
+{"Time":"2026-10-16T20:47:39.748712+08:00","Action":"start","Package":"agi-assistant/internal/infrastructure/llm"}
+{"Time":"2026-10-16T20:47:40.8620681+08:00","Action":"run","Package":"agi-assistant/internal/infrastructure/llm","Test":"TestComparisonContract"}
+{"Time":"2026-10-16T20:47:40.8620681+08:00","Action":"output","Package":"agi-assistant/internal/infrastructure/llm","Test":"TestComparisonContract","Output":"=== RUN   TestComparisonContract\n"}
+{"Time":"2026-10-16T20:47:40.86261+08:00","Action":"run","Package":"agi-assistant/internal/infrastructure/llm","Test":"TestComparisonContract/HTTP429"}
+{"Time":"2026-10-16T20:47:40.86261+08:00","Action":"output","Package":"agi-assistant/internal/infrastructure/llm","Test":"TestComparisonContract/HTTP429","Output":"=== RUN   TestComparisonContract/HTTP429\n"}
+{"Time":"2026-10-16T20:47:40.86261+08:00","Action":"output","Package":"agi-assistant/internal/infrastructure/llm","Test":"TestComparisonContract/HTTP429","Output":"--- PASS: TestComparisonContract/HTTP429 (0.00s)\n"}
+{"Time":"2026-10-16T20:47:40.86261+08:00","Action":"pass","Package":"agi-assistant/internal/infrastructure/llm","Test":"TestComparisonContract/HTTP429","Elapsed":0}
+{"Time":"2026-10-16T20:47:40.86261+08:00","Action":"run","Package":"agi-assistant/internal/infrastructure/llm","Test":"TestComparisonContract/HTTP503"}
+{"Time":"2026-10-16T20:47:40.86261+08:00","Action":"output","Package":"agi-assistant/internal/infrastructure/llm","Test":"TestComparisonContract/HTTP503","Output":"=== RUN   TestComparisonContract/HTTP503\n"}
+{"Time":"2026-10-16T20:47:40.86261+08:00","Action":"output","Package":"agi-assistant/internal/infrastructure/llm","Test":"TestComparisonContract/HTTP503","Output":"--- PASS: TestComparisonContract/HTTP503 (0.00s)\n"}
+{"Time":"2026-10-16T20:47:40.86261+08:00","Action":"pass","Package":"agi-assistant/internal/infrastructure/llm","Test":"TestComparisonContract/HTTP503","Elapsed":0}
+{"Time":"2026-10-16T20:47:40.86261+08:00","Action":"run","Package":"agi-assistant/internal/infrastructure/llm","Test":"TestComparisonContract/ClientTimeout"}
+{"Time":"2026-10-16T20:47:40.86261+08:00","Action":"output","Package":"agi-assistant/internal/infrastructure/llm","Test":"TestComparisonContract/ClientTimeout","Output":"=== RUN   TestComparisonContract/ClientTimeout\n"}
+{"Time":"2026-10-16T20:47:40.8832193+08:00","Action":"output","Package":"agi-assistant/internal/infrastructure/llm","Test":"TestComparisonContract/ClientTimeout","Output":"--- PASS: TestComparisonContract/ClientTimeout (0.02s)\n"}
+{"Time":"2026-10-16T20:47:40.8832193+08:00","Action":"pass","Package":"agi-assistant/internal/infrastructure/llm","Test":"TestComparisonContract/ClientTimeout","Elapsed":0.02}
+{"Time":"2026-10-16T20:47:40.8832193+08:00","Action":"run","Package":"agi-assistant/internal/infrastructure/llm","Test":"TestComparisonContract/TaskCanceledInFlight"}
+{"Time":"2026-10-16T20:47:40.8832193+08:00","Action":"output","Package":"agi-assistant/internal/infrastructure/llm","Test":"TestComparisonContract/TaskCanceledInFlight","Output":"=== RUN   TestComparisonContract/TaskCanceledInFlight\n"}
+{"Time":"2026-10-16T20:47:40.8832193+08:00","Action":"output","Package":"agi-assistant/internal/infrastructure/llm","Test":"TestComparisonContract/TaskCanceledInFlight","Output":"--- PASS: TestComparisonContract/TaskCanceledInFlight (0.00s)\n"}
+{"Time":"2026-10-16T20:47:40.8832193+08:00","Action":"pass","Package":"agi-assistant/internal/infrastructure/llm","Test":"TestComparisonContract/TaskCanceledInFlight","Elapsed":0}
+{"Time":"2026-10-16T20:47:40.8832193+08:00","Action":"run","Package":"agi-assistant/internal/infrastructure/llm","Test":"TestComparisonContract/EmptyResponse"}
+{"Time":"2026-10-16T20:47:40.8832193+08:00","Action":"output","Package":"agi-assistant/internal/infrastructure/llm","Test":"TestComparisonContract/EmptyResponse","Output":"=== RUN   TestComparisonContract/EmptyResponse\n"}
+{"Time":"2026-10-16T20:47:40.8832193+08:00","Action":"output","Package":"agi-assistant/internal/infrastructure/llm","Test":"TestComparisonContract/EmptyResponse","Output":"--- PASS: TestComparisonContract/EmptyResponse (0.00s)\n"}
+{"Time":"2026-10-16T20:47:40.8832193+08:00","Action":"pass","Package":"agi-assistant/internal/infrastructure/llm","Test":"TestComparisonContract/EmptyResponse","Elapsed":0}
+{"Time":"2026-10-16T20:47:40.8832193+08:00","Action":"run","Package":"agi-assistant/internal/infrastructure/llm","Test":"TestComparisonContract/MalformedJSON"}
+{"Time":"2026-10-16T20:47:40.8832193+08:00","Action":"output","Package":"agi-assistant/internal/infrastructure/llm","Test":"TestComparisonContract/MalformedJSON","Output":"=== RUN   TestComparisonContract/MalformedJSON\n"}
+{"Time":"2026-10-16T20:47:40.8832193+08:00","Action":"output","Package":"agi-assistant/internal/infrastructure/llm","Test":"TestComparisonContract/MalformedJSON","Output":"--- PASS: TestComparisonContract/MalformedJSON (0.00s)\n"}
+{"Time":"2026-10-16T20:47:40.8832193+08:00","Action":"pass","Package":"agi-assistant/internal/infrastructure/llm","Test":"TestComparisonContract/MalformedJSON","Elapsed":0}
+{"Time":"2026-10-16T20:47:40.8832193+08:00","Action":"run","Package":"agi-assistant/internal/infrastructure/llm","Test":"TestComparisonContract/TruncatedStream"}
+{"Time":"2026-10-16T20:47:40.8832193+08:00","Action":"output","Package":"agi-assistant/internal/infrastructure/llm","Test":"TestComparisonContract/TruncatedStream","Output":"=== RUN   TestComparisonContract/TruncatedStream\n"}
+{"Time":"2026-10-16T20:47:40.8837253+08:00","Action":"output","Package":"agi-assistant/internal/infrastructure/llm","Test":"TestComparisonContract/TruncatedStream","Output":"--- PASS: TestComparisonContract/TruncatedStream (0.00s)\n"}
+{"Time":"2026-10-16T20:47:40.8837253+08:00","Action":"pass","Package":"agi-assistant/internal/infrastructure/llm","Test":"TestComparisonContract/TruncatedStream","Elapsed":0}
+{"Time":"2026-10-16T20:47:40.8837253+08:00","Action":"run","Package":"agi-assistant/internal/infrastructure/llm","Test":"TestComparisonContract/LateCancellation"}
+{"Time":"2026-10-16T20:47:40.8837253+08:00","Action":"output","Package":"agi-assistant/internal/infrastructure/llm","Test":"TestComparisonContract/LateCancellation","Output":"=== RUN   TestComparisonContract/LateCancellation\n"}
+{"Time":"2026-10-16T20:47:40.8837253+08:00","Action":"output","Package":"agi-assistant/internal/infrastructure/llm","Test":"TestComparisonContract/LateCancellation","Output":"--- PASS: TestComparisonContract/LateCancellation (0.00s)\n"}
+{"Time":"2026-10-16T20:47:40.8837253+08:00","Action":"pass","Package":"agi-assistant/internal/infrastructure/llm","Test":"TestComparisonContract/LateCancellation","Elapsed":0}
+{"Time":"2026-10-16T20:47:40.8837253+08:00","Action":"run","Package":"agi-assistant/internal/infrastructure/llm","Test":"TestComparisonContract/MissingConfiguration"}
+{"Time":"2026-10-16T20:47:40.8837253+08:00","Action":"output","Package":"agi-assistant/internal/infrastructure/llm","Test":"TestComparisonContract/MissingConfiguration","Output":"=== RUN   TestComparisonContract/MissingConfiguration\n"}
+{"Time":"2026-10-16T20:47:40.8837253+08:00","Action":"output","Package":"agi-assistant/internal/infrastructure/llm","Test":"TestComparisonContract/MissingConfiguration","Output":"--- PASS: TestComparisonContract/MissingConfiguration (0.00s)\n"}
+{"Time":"2026-10-16T20:47:40.8837253+08:00","Action":"pass","Package":"agi-assistant/internal/infrastructure/llm","Test":"TestComparisonContract/MissingConfiguration","Elapsed":0}
+{"Time":"2026-10-16T20:47:40.8837253+08:00","Action":"output","Package":"agi-assistant/internal/infrastructure/llm","Test":"TestComparisonContract","Output":"--- PASS: TestComparisonContract (0.02s)\n"}
+{"Time":"2026-10-16T20:47:40.8837253+08:00","Action":"pass","Package":"agi-assistant/internal/infrastructure/llm","Test":"TestComparisonContract","Elapsed":0.02}
+{"Time":"2026-10-16T20:47:40.8837253+08:00","Action":"output","Package":"agi-assistant/internal/infrastructure/llm","Output":"PASS\n"}
+{"Time":"2026-10-16T20:47:40.9025952+08:00","Action":"output","Package":"agi-assistant/internal/infrastructure/llm","Output":"ok  \tagi-assistant/internal/infrastructure/llm\t1.154s\n"}
+{"Time":"2026-10-16T20:47:40.9025952+08:00","Action":"pass","Package":"agi-assistant/internal/infrastructure/llm","Elapsed":1.154}

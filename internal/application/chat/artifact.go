@@ -54,12 +54,12 @@ func (a *UnifiedAgent) produceArtifact(
 	hostWS string,
 	onEvent func(StreamEvent),
 ) *ReActStep {
-	if hostWS == "" || strings.TrimSpace(content) == "" {
+	if ctx.Err() != nil || hostWS == "" || strings.TrimSpace(content) == "" {
 		return nil
 	}
 
 	needs, filename := a.decideArtifact(ctx, query)
-	if !needs {
+	if !needs || ctx.Err() != nil {
 		return nil
 	}
 	filename = sanitizeFilename(filename)
@@ -73,6 +73,12 @@ func (a *UnifiedAgent) produceArtifact(
 	})
 
 	produced, backend := a.materialize(ctx, hostWS, filename, content)
+	if ctx.Err() != nil {
+		emit(onEvent, "node_done", map[string]string{
+			"id": "artifact", "tool": "produce_artifact", "status": "cancelled",
+		})
+		return nil
+	}
 
 	var obs string
 	switch {
@@ -95,6 +101,9 @@ func (a *UnifiedAgent) produceArtifact(
 // materialize 把正文写到工作目录的目标文件。返回 (是否成功, 实际执行后端)。
 // 优先在沙箱容器内 cp（在 /workspace 内完成 → 挂载到宿主机桌面）；否则 Go 落盘兜底。
 func (a *UnifiedAgent) materialize(ctx context.Context, hostWS, filename, content string) (bool, string) {
+	if ctx.Err() != nil {
+		return false, ""
+	}
 	stage := ".agi_stage_" + fmt.Sprint(time.Now().UnixNano())
 	stagePath := filepath.Join(hostWS, stage)
 	finalPath := filepath.Join(hostWS, filename)
@@ -126,6 +135,9 @@ func (a *UnifiedAgent) materialize(ctx context.Context, hostWS, filename, conten
 	}
 
 	// 3) 兜底：Go 直接落盘到挂载目录（等价于写入桌面）
+	if ctx.Err() != nil {
+		return false, ""
+	}
 	if err := os.WriteFile(finalPath, []byte(content), 0o644); err != nil {
 		logger.C(ctx).Warn("artifact final write failed", "err", err)
 		return false, ""
@@ -162,7 +174,10 @@ func (a *UnifiedAgent) decideArtifact(ctx context.Context, query string) (bool, 
 
 用户请求：%s`, query)
 
-	raw := a.llm.ChatContextFast(ctx, "你严格只输出一行极简 JSON。", []llm.Message{{Role: "user", Content: prompt}})
+	raw, err := a.llm.ChatContextFast(ctx, "你严格只输出一行极简 JSON。", []llm.Message{{Role: "user", Content: prompt}})
+	if err != nil {
+		return heuristic()
+	}
 	raw = strings.TrimSpace(raw)
 	raw = strings.TrimPrefix(raw, "```json")
 	raw = strings.TrimPrefix(raw, "```")

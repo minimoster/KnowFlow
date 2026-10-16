@@ -93,7 +93,7 @@ export PPROF_ADMIN_TOKEN="xxx"     # 仅 observability.pprof.enabled=true 时需
 - `skillhub.enabled` / `skillhub.keyword`
 - `sandbox.backend` / `sandbox.artifact_host_dir`
 
-配置文件里的 `"."` 只是占位符。因为非空字符串会被视为“已配置真实 API”，如果不替换，LLM 请求会失败后降级 mock。
+配置文件里的 `"."` 只是占位符，需替换为有效配置。`llm.mode` 默认为 `real`，真实调用失败会返回错误；仅演示或离线测试时显式设置 `llm.mode: mock`，缺少 Key 不会自动启用模拟回复。
 
 ### 3. 启动基础设施
 
@@ -360,15 +360,19 @@ npm run build
 
 这是当前设计边界。GitHub Skill 只是 prompt 包装，不会 clone 仓库、不会执行仓库代码。
 
-**LLM 一直降级 mock？**
+**LLM 调用失败或显示模拟回复？**
 
-检查 `llm.api_key`、`llm.api_url`、模型名和网络。配置里的 `"."` 是占位符，会触发真实请求但通常失败。
+检查 `llm.mode`、`llm.api_key`、`llm.api_url`、模型名和网络。配置里的 `"."` 是占位符，会触发真实请求但通常失败。`real` 模式的错误通过响应 `error` 字段/SSE `error` 事件返回，不会回退 mock。
 
 **RAG 结果不准或 Milvus 报维度错误？**
 
 确认 `rag.rag_milvus_dim` 与 embedding 模型输出维度一致，并在变更维度后清理旧 Milvus collection / 数据卷。
 
 ## 测试状态
+
+第一阶段的离线故障验证、40 题证据审阅流程及三组检索评测入口见 [RAG 评测说明](test/RAG_EVALUATION.md)。旧 `test/gold.txt` 是未审定的自动候选标签，不能作为可信效果成绩。
+
+九项合成故障契约的固定版本对照为 0/9 → 8/9 → 9/9，原始日志已保留；该结果仅验证失败/取消传播，**不是 RAG 准确率提升**。40 题仍全部待人工审阅。双人盲审候选池、分歧门禁及失败复盘导出可通过 `test/rag_review.py` 运行；离线指标与审阅工具测试使用 `python -m unittest discover -s test -p 'test_rag*.py' -v`。
 
 当前可用：
 

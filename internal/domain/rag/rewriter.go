@@ -7,16 +7,17 @@
 //
 // 设计要点：
 //   - Rewriter 是接口；默认实现为 LLMRewriter，复用注入的 generateFn，
-//     不引入新依赖；llm 不可用时优雅降级为 [original_query]
-//   - 失败 / 解析异常时一律 fallback 到原查询（never block）
+//     不引入新依赖；未配置回调时使用 [original_query]
+//   - 真实调用失败、解析异常或取消时向上返回错误
 //   - HistoryMessage 抽象成最小结构，避免 rag 包反向依赖 memory 包
 package rag
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
 
-	"agi-assistant/internal/pkg/logger"
+	"fmt"
 )
 
 // HistoryMessage 是 Rewriter 看到的对话历史最小结构
@@ -29,21 +30,21 @@ type HistoryMessage struct {
 type Rewriter interface {
 	// Rewrite 接收原始 query 和最近 N 轮对话历史，返回 ≥1 条改写后的查询。
 	// 第一条建议是 history-aware 的"独立查询"，后续是同义改写。
-	// 实现失败时应返回 [original]（永不返回空切片或 error 让上层降级）。
-	Rewrite(query string, history []HistoryMessage) []string
+	// 未配置时返回原查询；调用失败或取消必须返回 error。
+	Rewrite(ctx context.Context, query string, history []HistoryMessage) ([]string, error)
 }
 
 // ─────────────────────────────── LLMRewriter ──────────────────────────────
 
 // LLMRewriter 用 LLM 做改写，受 numQueries 控制最终条数
 type LLMRewriter struct {
-	generateFn func(systemPrompt, userMsg string) string
+	generateFn func(context.Context, string, string) (string, error)
 	numQueries int // 含原查询在内的目标改写条数（建议 3）
 }
 
 // NewLLMRewriter 创建 LLM 改写器；generateFn 为 nil 或 numQueries<=1 时
 // Rewrite 直接返回原查询，等价于关闭改写
-func NewLLMRewriter(generateFn func(systemPrompt, userMsg string) string, numQueries int) *LLMRewriter {
+func NewLLMRewriter(generateFn func(context.Context, string, string) (string, error), numQueries int) *LLMRewriter {
 	if numQueries <= 0 {
 		numQueries = 3
 	}
@@ -64,13 +65,16 @@ const rewriteSystemPrompt = `你是检索系统的查询改写助手。给定用
 - 第一条必须可独立检索（不依赖历史）`
 
 // Rewrite 实现接口
-func (r *LLMRewriter) Rewrite(query string, history []HistoryMessage) []string {
+func (r *LLMRewriter) Rewrite(ctx context.Context, query string, history []HistoryMessage) ([]string, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	query = strings.TrimSpace(query)
 	if query == "" {
-		return nil
+		return nil, nil
 	}
 	if r.generateFn == nil || r.numQueries <= 1 {
-		return []string{query}
+		return []string{query}, nil
 	}
 
 	// 构造历史摘要，限制长度避免 prompt 过长
@@ -99,11 +103,13 @@ func (r *LLMRewriter) Rewrite(query string, history []HistoryMessage) []string {
 	hb.WriteString("\n当前问题：" + query)
 
 	systemPrompt := strings.Replace(rewriteSystemPrompt, "%d", itoa(r.numQueries), 1)
-	raw := r.generateFn(systemPrompt, hb.String())
+	raw, err := r.generateFn(ctx, systemPrompt, hb.String())
+	if err != nil {
+		return nil, err
+	}
 	queries := parseRewriteJSON(raw)
 	if len(queries) == 0 {
-		logger.L().Warn("query rewrite parse failed, using original query", "raw_preview", firstN(raw, 100))
-		return []string{query}
+		return nil, fmt.Errorf("query rewrite returned invalid/empty queries")
 	}
 
 	// 兜底：始终保留原查询，避免改写完全跑偏后召回归零
@@ -111,7 +117,7 @@ func (r *LLMRewriter) Rewrite(query string, history []HistoryMessage) []string {
 	if len(queries) > r.numQueries {
 		queries = queries[:r.numQueries]
 	}
-	return queries
+	return queries, nil
 }
 
 // parseRewriteJSON 容忍 markdown 代码块包裹

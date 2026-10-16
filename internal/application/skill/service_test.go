@@ -75,7 +75,7 @@ func TestEnabledToolsExecutesGitHubPromptSkill(t *testing.T) {
 		UserID:  "u1",
 		Enabled: true,
 	}}}
-	svc := NewService(repo, nil, llm.New(&config.APIConfig{}), false)
+	svc := NewService(repo, nil, llm.New(&config.APIConfig{LLMConfig: config.LLMConfig{LLMMode: "mock"}}), false)
 
 	tools := svc.EnabledTools("u1")
 	ghTool, ok := tools["skill_clhikari_astrbot_plugin_office_assistant"]

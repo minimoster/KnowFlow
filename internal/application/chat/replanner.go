@@ -125,7 +125,10 @@ func (a *UnifiedAgent) llmReplan(
 		base = memPrefix + "\n\n" + base
 	}
 
-	raw := a.llm.ChatContextFast(ctx, base, []llm.Message{{Role: "user", Content: prompt}})
+	raw, err := a.llm.ChatContextFast(ctx, base, []llm.Message{{Role: "user", Content: prompt}})
+	if err != nil {
+		return nil
+	}
 	if ctx.Err() != nil {
 		return nil
 	}

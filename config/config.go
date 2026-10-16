@@ -22,6 +22,7 @@ type ServerConfig struct {
 
 // LLMConfig 聊天模型 API
 type LLMConfig struct {
+	LLMMode   string // real (default) | mock (explicit demo/test only)
 	LLMAPIUrl string
 	LLMAPIKey string
 	LLMModel  string
@@ -31,7 +32,8 @@ type LLMConfig struct {
 	Temperature  float64
 }
 
-func (c LLMConfig) IsRealLLM() bool { return c.LLMAPIKey != "" }
+func (c LLMConfig) IsMockLLM() bool { return c.LLMMode == "mock" }
+func (c LLMConfig) IsRealLLM() bool { return !c.IsMockLLM() }
 
 // EmbeddingConfig 向量化模型 API
 type EmbeddingConfig struct {
@@ -238,6 +240,7 @@ type APIConfig struct {
 // yamlFile 对应 config/config.yaml 的结构
 type yamlFile struct {
 	LLM struct {
+		Mode        string  `yaml:"mode"`
 		APIUrl      string  `yaml:"api_url"`
 		APIKey      string  `yaml:"api_key"`
 		Model       string  `yaml:"model"`
@@ -390,6 +393,7 @@ func DefaultConfig() *APIConfig {
 		LLMConfig: LLMConfig{
 			LLMAPIUrl:    y.LLM.APIUrl,
 			LLMAPIKey:    y.LLM.APIKey,
+			LLMMode:      y.LLM.Mode,
 			LLMModel:     y.LLM.Model,
 			LLMFastModel: y.LLM.FastModel,
 			Temperature:  y.LLM.Temperature,

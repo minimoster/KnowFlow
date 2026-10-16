@@ -380,6 +380,18 @@ func (rt *GraphRuntime) executeNode(ctx context.Context, nodeID graph.NodeID, wg
 func (rt *GraphRuntime) executeSingleNode(ctx context.Context, nodeID graph.NodeID) (string, error) {
 	node := rt.graph.Nodes[nodeID]
 	executor := executorName(node)
+	// 子 Agent 的报告/保存流水线不能消费失败的上游材料。
+	if node.Type == graph.NodeTypeSubAgent {
+		for _, depID := range node.DependsOn {
+			dep := rt.graph.Nodes[depID]
+			if dep != nil && (dep.Status == graph.StatusFailed || dep.Status == graph.StatusCancelled) {
+				err := fmt.Errorf("upstream node %s failed; %s was not executed", depID, executor)
+				rt.graph.SetNodeStatus(nodeID, graph.StatusFailed)
+				rt.graph.SetNodeError(nodeID, err.Error())
+				return "", err
+			}
+		}
+	}
 
 	// 推送节点开始事件
 	if rt.onEvent != nil {
@@ -460,6 +472,9 @@ func (rt *GraphRuntime) executeSingleNode(ctx context.Context, nodeID graph.Node
 	var result string
 	var execErr error
 	maxRetries := rt.agent.cfg.MaxRetries
+	if maxRetries < 1 {
+		maxRetries = 1
+	}
 	retryDelay := time.Duration(rt.agent.cfg.RetryDelayMs) * time.Millisecond
 	stepTimeout := time.Duration(rt.agent.cfg.StepTimeoutMs) * time.Millisecond
 	// 子 Agent 内部会串行执行多次 LLM 调用（planQueries + 检索 + 综合），
@@ -478,7 +493,7 @@ func (rt *GraphRuntime) executeSingleNode(ctx context.Context, nodeID graph.Node
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		if ctx.Err() != nil {
 			rt.graph.SetNodeStatus(nodeID, graph.StatusCancelled)
-			return "", fmt.Errorf("被用户中断")
+			return "", ctx.Err()
 		}
 
 		// 单步 ctx：每次 attempt 都派生一个新的 timeout ctx，
@@ -493,6 +508,10 @@ func (rt *GraphRuntime) executeSingleNode(ctx context.Context, nodeID graph.Node
 
 		var retryable bool
 		result, retryable, execErr = run(attemptCtx)
+		// A legacy executor may ignore cancellation and return a late payload.
+		if err := attemptCtx.Err(); err != nil {
+			result, execErr, retryable = "", err, ctx.Err() == nil
+		}
 		attemptCancel()
 
 		if execErr == nil {
@@ -505,7 +524,14 @@ func (rt *GraphRuntime) executeSingleNode(ctx context.Context, nodeID graph.Node
 			break
 		}
 		if attempt < maxRetries-1 {
-			time.Sleep(retryDelay)
+			timer := time.NewTimer(retryDelay)
+			select {
+			case <-timer.C:
+			case <-ctx.Done():
+				timer.Stop()
+				rt.graph.SetNodeStatus(nodeID, graph.StatusCancelled)
+				return "", ctx.Err()
+			}
 		}
 	}
 
@@ -514,6 +540,9 @@ func (rt *GraphRuntime) executeSingleNode(ctx context.Context, nodeID graph.Node
 		logger.C(ctx).Warn("node exec failed", "id", nodeID, "type", node.Type, "executor", executor,
 			"step_timeout_ms", stepTimeout.Milliseconds(), "parent_ctx_err", ctx.Err(), "err", errMsg)
 		rt.graph.SetNodeStatus(nodeID, graph.StatusFailed)
+		if ctx.Err() != nil {
+			rt.graph.SetNodeStatus(nodeID, graph.StatusCancelled)
+		}
 		rt.graph.SetNodeError(nodeID, errMsg)
 		if rt.onEvent != nil {
 			rt.onEvent(NewStreamEvent("step", ReActStep{Type: StepObservation, Content: fmt.Sprintf("执行失败: %s", errMsg)}))
@@ -527,7 +556,7 @@ func (rt *GraphRuntime) executeSingleNode(ctx context.Context, nodeID graph.Node
 		})
 
 		// Plan-and-ReAct: 节点失败时触发局部 replan（补一个替代节点）
-		if rt.cfg.ReplanEnabled && rt.cfg.ReplanOnFailed && rt.replanUsed < rt.cfg.MaxReplan {
+		if ctx.Err() == nil && rt.cfg.ReplanEnabled && rt.cfg.ReplanOnFailed && rt.replanUsed < rt.cfg.MaxReplan {
 			// tryReplan 是并发安全的：AddNodes 在 Execute 主循环单线程调用，
 			// 但这里在节点执行 goroutine 内触发，需要加锁保护 graph 的写路径
 			rt.mu.Lock()

@@ -144,7 +144,10 @@ func (a *UnifiedAgent) llmJudgeConflict(
 [{"old_id":<id>,"is_contradicting":true|false,"reason":"<简短理由>"}]
 只输出 JSON，不要任何其他内容。`
 
-	raw := a.llm.ChatContext(ctx, "", []llm.Message{{Role: "user", Content: prompt}})
+	raw, err := a.llm.ChatContext(ctx, "", []llm.Message{{Role: "user", Content: prompt}})
+	if err != nil {
+		return nil
+	}
 	raw = strings.TrimSpace(raw)
 	raw = strings.TrimPrefix(raw, "```json")
 	raw = strings.TrimPrefix(raw, "```")

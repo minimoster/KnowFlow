@@ -77,6 +77,7 @@ type Snapshot struct {
 
 // Response 是 UnifiedAgent.Process 的输出，携带本次请求的全部上下文
 type Response struct {
+	Error          string             `json:"error,omitempty"`
 	Query          string             `json:"query"`
 	Answer         string             `json:"answer"`
 	Mode           string             `json:"mode"` // chat / tool / rag / memory / react

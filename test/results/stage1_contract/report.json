@@ -1,0 +1,105 @@
+{
+  "kind": "SYNTHETIC_FAILURE_CONTRACT_COMPARISON_NOT_RAG_QUALITY",
+  "contract": "a failed/canceled model call returns empty final answer and explicit error",
+  "scope": "in-memory HTTP transport; no tokens, paid calls or model-quality claims",
+  "go_version": "go version go1.26.5 windows/amd64",
+  "probe_template_sha256": "94bfa93052e7483b266797bbba375525cf7a2ecd42b70ede8fce678f7133c25e",
+  "revisions": [
+    {
+      "revision": "9afe774372f2068eb7e57ecdf1c491965eace2e3",
+      "legacy_string_only_api": true,
+      "call_adapter_sha256": "59dde879f51739f8bdf898e1df446de3a21dcb5a14d227c72b1b46e22c16a33d",
+      "command": [
+        "go",
+        "test",
+        "-json",
+        "-p",
+        "1",
+        "-count=1",
+        "-timeout",
+        "15s",
+        "./internal/infrastructure/llm",
+        "-run",
+        "^TestComparisonContract$"
+      ],
+      "exit_code": 1,
+      "cases": {
+        "HTTP429": "fail",
+        "HTTP503": "fail",
+        "ClientTimeout": "fail",
+        "TaskCanceledInFlight": "fail",
+        "EmptyResponse": "fail",
+        "MalformedJSON": "fail",
+        "TruncatedStream": "fail",
+        "LateCancellation": "fail",
+        "MissingConfiguration": "fail"
+      },
+      "passed": 0,
+      "total": 9
+    },
+    {
+      "revision": "c3e62adde05d5413771b8b16dcf87e47ef6ccdfa",
+      "legacy_string_only_api": false,
+      "call_adapter_sha256": "330514be095d58df15da36b53f881f00033107bb3eed0332810cbf857a4dda20",
+      "command": [
+        "go",
+        "test",
+        "-json",
+        "-p",
+        "1",
+        "-count=1",
+        "-timeout",
+        "15s",
+        "./internal/infrastructure/llm",
+        "-run",
+        "^TestComparisonContract$"
+      ],
+      "exit_code": 1,
+      "cases": {
+        "HTTP429": "pass",
+        "HTTP503": "pass",
+        "ClientTimeout": "pass",
+        "TaskCanceledInFlight": "pass",
+        "EmptyResponse": "pass",
+        "MalformedJSON": "pass",
+        "TruncatedStream": "pass",
+        "LateCancellation": "fail",
+        "MissingConfiguration": "pass"
+      },
+      "passed": 8,
+      "total": 9
+    },
+    {
+      "revision": "bb0cdc16f8c99dc72b3257d666204ed8c6adafb5",
+      "legacy_string_only_api": false,
+      "call_adapter_sha256": "330514be095d58df15da36b53f881f00033107bb3eed0332810cbf857a4dda20",
+      "command": [
+        "go",
+        "test",
+        "-json",
+        "-p",
+        "1",
+        "-count=1",
+        "-timeout",
+        "15s",
+        "./internal/infrastructure/llm",
+        "-run",
+        "^TestComparisonContract$"
+      ],
+      "exit_code": 0,
+      "cases": {
+        "HTTP429": "pass",
+        "HTTP503": "pass",
+        "ClientTimeout": "pass",
+        "TaskCanceledInFlight": "pass",
+        "EmptyResponse": "pass",
+        "MalformedJSON": "pass",
+        "TruncatedStream": "pass",
+        "LateCancellation": "pass",
+        "MissingConfiguration": "pass"
+      },
+      "passed": 9,
+      "total": 9
+    }
+  ]
+}

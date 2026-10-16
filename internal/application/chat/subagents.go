@@ -75,7 +75,10 @@ func (r *researchAgent) Description() string {
 func (r *researchAgent) Run(ctx context.Context, task SubAgentTask) (string, error) {
 	// 子 Agent 复用主请求的 STM 历史给 RAG rewriter 用——userID 从 ctx 取
 	userID := usercontext.UserIDFromContext(ctx)
-	queries := r.planQueries(ctx, task)
+	queries, err := r.planQueries(ctx, task)
+	if err != nil {
+		return "", err
+	}
 	var observations []string
 	var evidence []string
 	for _, q := range queries {
@@ -83,7 +86,10 @@ func (r *researchAgent) Run(ctx context.Context, task SubAgentTask) (string, err
 			return "", ctx.Err()
 		}
 		if r.agent.rag.Loaded {
-			answer, results := r.agent.rag.QueryWithHistory(q, r.agent.recentHistoryForRAG(userID))
+			answer, results, err := r.agent.rag.QueryWithHistory(ctx, q, r.agent.recentHistoryForRAG(userID))
+			if err != nil {
+				return "", err
+			}
 			observations = append(observations, fmt.Sprintf("Query: %s\nRAG Answer: %s", q, answer))
 			for _, sr := range results {
 				content := sr.Chunk.Content
@@ -95,10 +101,11 @@ func (r *researchAgent) Run(ctx context.Context, task SubAgentTask) (string, err
 			continue
 		}
 		if t, ok := r.agent.toolsSnapshot()["search_web"]; ok {
-			out, err := t.Execute(map[string]interface{}{"query": q})
-			if err == nil {
-				observations = append(observations, fmt.Sprintf("Query: %s\nSearch Result: %s", q, out))
+			out, err := executeToolContext(ctx, t, map[string]interface{}{"query": q})
+			if err != nil {
+				return "", err
 			}
+			observations = append(observations, fmt.Sprintf("Query: %s\nSearch Result: %s", q, out))
 		}
 	}
 	if len(observations) == 0 {
@@ -112,27 +119,33 @@ func (r *researchAgent) Run(ctx context.Context, task SubAgentTask) (string, err
 	return r.agent.llm.ChatContextFast(ctx,
 		"你是 research_agent。请基于观察结果输出结构化研究摘要，包含 Findings、Evidence、Open Questions。不要编造未出现的信息。",
 		[]llm.Message{{Role: "user", Content: userMsg}},
-	), nil
+	)
 }
 
-func (r *researchAgent) planQueries(ctx context.Context, task SubAgentTask) []string {
+func (r *researchAgent) planQueries(ctx context.Context, task SubAgentTask) ([]string, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	base := strings.TrimSpace(task.Goal)
 	if base == "" {
 		base = task.Query
 	}
 	if !r.agent.cfg.IsRealLLM() {
-		return []string{base}
+		return []string{base}, nil
 	}
-	raw := r.agent.llm.ChatContextFast(ctx,
+	raw, err := r.agent.llm.ChatContextFast(ctx,
 		"你是查询规划器。请把研究目标改写成 2-3 条互补检索查询，严格输出 JSON：{\"queries\":[\"...\"]}",
 		[]llm.Message{{Role: "user", Content: base}},
 	)
+	if err != nil {
+		return nil, err
+	}
 	var parsed struct {
 		Queries []string `json:"queries"`
 	}
 	raw = strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(strings.TrimPrefix(raw, "```json"), "```"), "```"))
 	if json.Unmarshal([]byte(raw), &parsed) != nil || len(parsed.Queries) == 0 {
-		return []string{base}
+		return []string{base}, nil
 	}
 	out := []string{base}
 	for _, q := range parsed.Queries {
@@ -141,7 +154,7 @@ func (r *researchAgent) planQueries(ctx context.Context, task SubAgentTask) []st
 			out = append(out, q)
 		}
 	}
-	return dedupStrings(out)
+	return dedupStrings(out), nil
 }
 
 type writerAgent struct{ agent *UnifiedAgent }
@@ -151,6 +164,9 @@ func (w *writerAgent) Description() string {
 	return "将上游研究结果整理为 Markdown 报告。"
 }
 func (w *writerAgent) Run(ctx context.Context, task SubAgentTask) (string, error) {
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
 	input := upstreamText(task)
 	if !w.agent.cfg.IsRealLLM() {
 		return "# " + safeTitle(task.Goal, task.Query) + "\n\n" + input, nil
@@ -158,7 +174,7 @@ func (w *writerAgent) Run(ctx context.Context, task SubAgentTask) (string, error
 	return w.agent.llm.ChatContextFast(ctx,
 		"你是 writer_agent。请把输入整理为清晰 Markdown 报告，包含摘要、分析、建议和下一步。",
 		[]llm.Message{{Role: "user", Content: fmt.Sprintf("写作目标：%s\n\n材料：\n%s", task.Goal, input)}},
-	), nil
+	)
 }
 
 type reviewAgent struct{ agent *UnifiedAgent }
@@ -168,6 +184,9 @@ func (r *reviewAgent) Description() string {
 	return "检查报告结构、事实一致性、证据覆盖和风险。"
 }
 func (r *reviewAgent) Run(ctx context.Context, task SubAgentTask) (string, error) {
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
 	input := upstreamText(task)
 	if !r.agent.cfg.IsRealLLM() {
 		return "Review: 内容已整理；建议人工确认关键事实。", nil
@@ -175,7 +194,7 @@ func (r *reviewAgent) Run(ctx context.Context, task SubAgentTask) (string, error
 	return r.agent.llm.ChatContextFast(ctx,
 		"你是 review_agent。请审查输入，输出问题清单、可信度和需要补证据的点。",
 		[]llm.Message{{Role: "user", Content: input}},
-	), nil
+	)
 }
 
 type docAgent struct{ agent *UnifiedAgent }
@@ -185,6 +204,9 @@ func (d *docAgent) Description() string {
 	return "将上游结果保存到本地文档库，并同步写入 RAG。"
 }
 func (d *docAgent) Run(ctx context.Context, task SubAgentTask) (string, error) {
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
 	content := documentContent(task)
 	if strings.TrimSpace(content) == "" {
 		content = task.Query

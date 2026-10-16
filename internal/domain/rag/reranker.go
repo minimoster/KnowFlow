@@ -9,36 +9,36 @@
 //   - Reranker 是接口；HybridStore 持有指针，nil 时走老路径（优雅降级）
 //   - 默认实现 LLMReranker 用 listwise 打分，复用注入的 generateFn，
 //     不引入新依赖；后续可加 CrossEncoderReranker / CohereReranker 等
-//   - 解析失败一律回退到原始 RRF 顺序，永不让 rerank 阻塞主链路
+//   - 调用/解析失败向上返回错误，避免评测将降级结果记成精排成绩
 package rag
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"sort"
 	"strings"
-
-	"agi-assistant/internal/pkg/logger"
 )
 
 // Reranker 重排序器接口
 type Reranker interface {
 	// Rerank 对候选 results 做精排，返回截断到 topK 的结果。
-	// 实现失败时应返回原始 results 截断到 topK，永不返回 nil 或 error。
-	Rerank(query string, results []HybridResult, topK int) []HybridResult
+	// 未配置时截断原顺序；真实调用失败或取消必须返回 error。
+	Rerank(ctx context.Context, query string, results []HybridResult, topK int) ([]HybridResult, error)
 }
 
 // ─────────────────────────────── LLMReranker ──────────────────────────────
 
 // LLMReranker 用一次 LLM listwise 调用对所有候选打分（0~10）
 type LLMReranker struct {
-	generateFn func(systemPrompt, userMsg string) string
+	generateFn func(context.Context, string, string) (string, error)
 	// previewLen 给 LLM 看的每条 chunk 的最大字符数，控制 prompt 大小
 	previewLen int
 }
 
 // NewLLMReranker 创建 LLM listwise 重排器
-func NewLLMReranker(generateFn func(systemPrompt, userMsg string) string, previewLen int) *LLMReranker {
+func NewLLMReranker(generateFn func(context.Context, string, string) (string, error), previewLen int) *LLMReranker {
 	if previewLen <= 0 {
 		previewLen = 200
 	}
@@ -64,12 +64,15 @@ const rerankSystemPrompt = `你是检索系统的精排器。给定用户问题�
 - 不依赖你自己的知识，只看给出的段落`
 
 // Rerank 实现接口
-func (r *LLMReranker) Rerank(query string, results []HybridResult, topK int) []HybridResult {
+func (r *LLMReranker) Rerank(ctx context.Context, query string, results []HybridResult, topK int) ([]HybridResult, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	if r.generateFn == nil || len(results) == 0 {
-		return truncate(results, topK)
+		return truncate(results, topK), nil
 	}
 	if len(results) == 1 {
-		return results
+		return results, nil
 	}
 
 	// 构造候选清单（截断每条 chunk 控制 prompt 大小）
@@ -85,11 +88,20 @@ func (r *LLMReranker) Rerank(query string, results []HybridResult, topK int) []H
 		fmt.Fprintf(&sb, "[%d] %s\n", i, preview)
 	}
 
-	raw := r.generateFn(rerankSystemPrompt, sb.String())
+	raw, err := r.generateFn(ctx, rerankSystemPrompt, sb.String())
+	if err != nil {
+		return nil, err
+	}
 	scores := parseRerankJSON(raw)
-	if len(scores) == 0 {
-		logger.L().Warn("rerank parse failed, falling back to RRF order", "raw_preview", firstN(raw, 100))
-		return truncate(results, topK)
+	if len(scores) != len(results) {
+		return nil, fmt.Errorf("rerank returned incomplete/invalid scores")
+	}
+	seen := make(map[int]bool, len(scores))
+	for _, score := range scores {
+		if score.Idx < 0 || score.Idx >= len(results) || seen[score.Idx] || score.Score < 0 || score.Score > 10 || math.Trunc(score.Score) != score.Score {
+			return nil, fmt.Errorf("rerank returned invalid/duplicate score index")
+		}
+		seen[score.Idx] = true
 	}
 
 	// 把 LLM 分数映射回结果上：以 LLM score 为主排序键，原 RRF score 作 tiebreaker
@@ -132,7 +144,7 @@ func (r *LLMReranker) Rerank(query string, results []HybridResult, topK int) []H
 		out = append(out, hr)
 		_ = rank
 	}
-	return truncate(out, topK)
+	return truncate(out, topK), nil
 }
 
 type rerankItem struct {

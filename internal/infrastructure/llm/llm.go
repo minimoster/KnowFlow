@@ -2,7 +2,6 @@ package llm
 
 import (
 	"agi-assistant/config"
-	"agi-assistant/internal/pkg/logger"
 	"bufio"
 	"bytes"
 	"context"
@@ -31,19 +30,29 @@ func New(cfg *config.APIConfig) *Client {
 	return &Client{
 		cfg: cfg,
 		// glm-5.2 是推理型模型，长 prompt + 非流式（等整段生成）单次可能数十秒，
-		// 60s 会把慢调用掐断降级 mock。放宽到 180s 保正确性（流式路径不受此上限影响体验）。
+		// 为慢调用保留 180s 上限；超时必须返回错误，不能生成模拟答案。
 		httpClient: &http.Client{Timeout: 180 * time.Second},
 	}
 }
 
+// NewWithHTTPClient permits offline transport injection without a listening port.
+// A nil client uses the normal timeout policy.
+func NewWithHTTPClient(cfg *config.APIConfig, httpClient *http.Client) *Client {
+	c := New(cfg)
+	if httpClient != nil {
+		c.httpClient = httpClient
+	}
+	return c
+}
+
 // Chat 发送对话请求，返回回复文本。
-// 若配置了真实 API Key 则调用远程接口，否则使用 Mock。
-func (c *Client) Chat(systemPrompt string, messages []Message) string {
+// 仅显式 mode=mock 时生成演示回复；真实模式错误由调用方处理。
+func (c *Client) Chat(systemPrompt string, messages []Message) (string, error) {
 	return c.ChatContext(context.Background(), systemPrompt, messages)
 }
 
 // ChatFast 使用快模型的一次性对话（内部步骤用，无 context）。
-func (c *Client) ChatFast(systemPrompt string, messages []Message) string {
+func (c *Client) ChatFast(systemPrompt string, messages []Message) (string, error) {
 	return c.ChatContextFast(context.Background(), systemPrompt, messages)
 }
 
@@ -55,51 +64,57 @@ func (c *Client) fastModel() string {
 	return c.cfg.LLMModel
 }
 
-// chatWithModel 是带 context 的对话核心：指定 model，封装 mock/取消/降级逻辑。
-func (c *Client) chatWithModel(ctx context.Context, model, systemPrompt string, messages []Message) string {
-	if c.cfg.IsRealLLM() {
-		reply, err := c.callAPIWithContext(ctx, model, systemPrompt, messages)
-		if err != nil {
-			if ctx.Err() != nil {
-				return "[已中断]"
-			}
-			logger.C(ctx).Warn("LLM API call failed, falling back to mock", "model", model, "err", err)
-			return c.mock(messages)
-		}
-		return reply
+func (c *Client) validate(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
 	}
-	return c.mock(messages)
+	if c.cfg.LLMMode != "" && c.cfg.LLMMode != "real" && c.cfg.LLMMode != "mock" {
+		return fmt.Errorf("invalid llm.mode: %q", c.cfg.LLMMode)
+	}
+	if !c.cfg.IsMockLLM() && (c.cfg.LLMAPIKey == "" || c.cfg.LLMAPIUrl == "" || c.cfg.LLMModel == "") {
+		return fmt.Errorf("LLM API 未配置；演示/测试请显式设置 llm.mode=mock")
+	}
+	return nil
+}
+
+func (c *Client) chatWithModel(ctx context.Context, model, systemPrompt string, messages []Message) (string, error) {
+	if err := c.validate(ctx); err != nil {
+		return "", err
+	}
+	if c.cfg.IsMockLLM() {
+		return c.mock(messages), nil
+	}
+	reply, err := c.callAPIWithContext(ctx, model, systemPrompt, messages)
+	if ctx.Err() != nil {
+		return "", ctx.Err()
+	}
+	return reply, err
 }
 
 // ChatContext 带 context 的对话请求（主模型），支持取消。
-func (c *Client) ChatContext(ctx context.Context, systemPrompt string, messages []Message) string {
+func (c *Client) ChatContext(ctx context.Context, systemPrompt string, messages []Message) (string, error) {
 	return c.chatWithModel(ctx, c.cfg.LLMModel, systemPrompt, messages)
 }
 
 // ChatContextFast 带 context 的对话请求（快模型），用于内部步骤。
-func (c *Client) ChatContextFast(ctx context.Context, systemPrompt string, messages []Message) string {
+func (c *Client) ChatContextFast(ctx context.Context, systemPrompt string, messages []Message) (string, error) {
 	return c.chatWithModel(ctx, c.fastModel(), systemPrompt, messages)
 }
 
 // ChatStreamContext 流式对话请求，每收到一个 token 片段调用 onToken 回调。
-// 返回聚合的完整回复文本。若 API 不可用则降级为同步调用。
-func (c *Client) ChatStreamContext(ctx context.Context, systemPrompt string, messages []Message, onToken func(string)) string {
-	if !c.cfg.IsRealLLM() {
+// 返回聚合的完整回复。失败直接返回错误，不重放请求或拼接模拟内容。
+func (c *Client) ChatStreamContext(ctx context.Context, systemPrompt string, messages []Message, onToken func(string)) (string, error) {
+	if err := c.validate(ctx); err != nil {
+		return "", err
+	}
+	if c.cfg.IsMockLLM() {
 		reply := c.mock(messages)
 		if onToken != nil {
 			onToken(reply)
 		}
-		return reply
+		return reply, nil
 	}
-	reply, err := c.callAPIStream(ctx, systemPrompt, messages, onToken)
-	if err != nil {
-		if ctx.Err() != nil {
-			return "[已中断]"
-		}
-		logger.C(ctx).Warn("LLM stream call failed, falling back to sync", "err", err)
-		return c.ChatContext(ctx, systemPrompt, messages)
-	}
-	return reply
+	return c.callAPIStream(ctx, systemPrompt, messages, onToken)
 }
 
 // ── OpenAI 兼容接口调用 ──────────────────────────────────────────────────
@@ -170,6 +185,9 @@ func (c *Client) callAPIWithContext(ctx context.Context, model, systemPrompt str
 		return "", fmt.Errorf("HTTP 请求失败: %w", err)
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("LLM API HTTP %d", resp.StatusCode)
+	}
 
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -178,13 +196,13 @@ func (c *Client) callAPIWithContext(ctx context.Context, model, systemPrompt str
 
 	var result apiResponse
 	if err := json.Unmarshal(data, &result); err != nil {
-		return "", fmt.Errorf("解析响应失败: %w, body: %s", err, string(data))
+		return "", fmt.Errorf("解析响应失败: %w", err)
 	}
 	if result.Error != nil {
 		return "", fmt.Errorf("API 错误: %s", result.Error.Message)
 	}
-	if len(result.Choices) == 0 {
-		return "", fmt.Errorf("API 返回空结果, body: %s", string(data))
+	if len(result.Choices) == 0 || strings.TrimSpace(result.Choices[0].Message.Content) == "" {
+		return "", fmt.Errorf("API 返回空结果")
 	}
 	return result.Choices[0].Message.Content, nil
 }
@@ -224,26 +242,27 @@ func (c *Client) callAPIStream(ctx context.Context, systemPrompt string, message
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		data, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("API 返回错误状态 %d, body: %s", resp.StatusCode, string(data))
+		return "", fmt.Errorf("LLM API HTTP %d", resp.StatusCode)
 	}
 
 	var fullReply strings.Builder
 	scanner := bufio.NewScanner(resp.Body)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+	completed := false
 
 	for scanner.Scan() {
 		line := scanner.Text()
-		if !strings.HasPrefix(line, "data: ") {
+		if !strings.HasPrefix(line, "data:") {
 			continue
 		}
-		data := strings.TrimPrefix(line, "data: ")
+		data := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
 		if strings.TrimSpace(data) == "[DONE]" {
+			completed = true
 			break
 		}
 		var chunk streamChunk
 		if err := json.Unmarshal([]byte(data), &chunk); err != nil {
-			continue
+			return "", fmt.Errorf("解析流式响应失败: %w", err)
 		}
 		if chunk.Error != nil {
 			return "", fmt.Errorf("API 流式错误: %s", chunk.Error.Message)
@@ -257,6 +276,18 @@ func (c *Client) callAPIStream(ctx context.Context, systemPrompt string, message
 				}
 			}
 		}
+	}
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
+	if err := scanner.Err(); err != nil {
+		return "", fmt.Errorf("读取流式响应失败: %w", err)
+	}
+	if !completed {
+		return "", fmt.Errorf("流式响应未完成: %w", io.ErrUnexpectedEOF)
+	}
+	if strings.TrimSpace(fullReply.String()) == "" {
+		return "", fmt.Errorf("API 返回空流式结果")
 	}
 	return fullReply.String(), nil
 }
@@ -417,7 +448,7 @@ func extractRuleBased(msg string) map[string]string {
 	return result
 }
 
-// ── Mock（无 API Key 时使用）────────────────────────────────────────────
+// ── Mock（仅显式 mode=mock 演示/测试时使用）─────────────────────────────
 
 func (c *Client) mock(messages []Message) string {
 	var userQuery string

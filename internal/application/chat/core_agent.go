@@ -150,30 +150,30 @@ func New(cfg *config.APIConfig, deps Deps) *UnifiedAgent {
 func (a *UnifiedAgent) wireRAGCallbacks() {
 	cfg := a.cfg
 	// LLM 合成回调（携带记忆上下文）
-	a.rag.SetGenerateFn(func(systemPrompt, userMsg string) string {
-		memPrefix := a.buildContextPrefix(context.Background(), userMsg, "rag")
+	a.rag.SetGenerateFn(func(ctx context.Context, systemPrompt, userMsg string) (string, error) {
+		memPrefix := a.buildContextPrefix(ctx, userMsg, "rag")
 		fullSystem := systemPrompt
 		if memPrefix != "" {
 			fullSystem = memPrefix + "\n\n" + systemPrompt + "\n结合用户偏好和记忆，用用户熟悉的方式回答。"
 		}
-		return a.llm.Chat(fullSystem, []llm.Message{{Role: "user", Content: userMsg}})
+		return a.llm.ChatContext(ctx, fullSystem, []llm.Message{{Role: "user", Content: userMsg}})
 	})
 	// Embedding 回调
-	a.rag.SetEmbedFn(func(text string) ([]float64, error) {
-		return a.llm.Embed(text)
+	a.rag.SetEmbedFn(func(ctx context.Context, text string) ([]float64, error) {
+		return a.llm.EmbedContext(ctx, text)
 	})
 	// Query Rewriter（history-aware + multi-query）。用独立 LLM 闭包不带
 	// 记忆前缀，避免改写 prompt 被偏好污染。改写属内部步骤 → 走快模型。
 	if cfg.RAGRewriteEnabled && cfg.RAGRewriteNumQueries > 1 {
-		rewriteLLM := func(systemPrompt, userMsg string) string {
-			return a.llm.ChatFast(systemPrompt, []llm.Message{{Role: "user", Content: userMsg}})
+		rewriteLLM := func(ctx context.Context, systemPrompt, userMsg string) (string, error) {
+			return a.llm.ChatContextFast(ctx, systemPrompt, []llm.Message{{Role: "user", Content: userMsg}})
 		}
 		a.rag.SetRewriter(rag.NewLLMRewriter(rewriteLLM, cfg.RAGRewriteNumQueries))
 	}
 	// Reranker（LLM listwise 精排）——内部步骤 → 走快模型
 	if cfg.RAGRerankEnabled {
-		rerankLLM := func(systemPrompt, userMsg string) string {
-			return a.llm.ChatFast(systemPrompt, []llm.Message{{Role: "user", Content: userMsg}})
+		rerankLLM := func(ctx context.Context, systemPrompt, userMsg string) (string, error) {
+			return a.llm.ChatContextFast(ctx, systemPrompt, []llm.Message{{Role: "user", Content: userMsg}})
 		}
 		a.rag.SetReranker(rag.NewLLMReranker(rerankLLM, cfg.RAGRerankPreviewLen))
 	}
@@ -231,7 +231,7 @@ func (a *UnifiedAgent) registerBuiltinTools() {
 			return a.llm.Chat(
 				"你是一个知识丰富的搜索引擎助手。请基于你的知识，对用户的搜索问题给出准确、详细的回答。直接给出答案，不要说「我不知道」或「我无法搜索」。",
 				[]llm.Message{{Role: "user", Content: "搜索：" + q}},
-			), nil
+			)
 		},
 	})
 }

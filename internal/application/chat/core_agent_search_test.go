@@ -13,6 +13,7 @@ import (
 
 func TestSearchWebLogsTavilyFailureBeforeLLMFallback(t *testing.T) {
 	cfg := &config.APIConfig{
+		LLMConfig: config.LLMConfig{LLMMode: "mock"},
 		SearchConfig: config.SearchConfig{
 			SearchAPIKey: "test-key",
 			SearchAPIURL: "://invalid-url",

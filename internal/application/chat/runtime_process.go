@@ -81,6 +81,12 @@ type preparedRequest struct {
 // onEvent == nil → 非流式（不推送任何事件，但内部仍走完同一段逻辑）
 // onEvent != nil → 流式（在 route / step / token / tool_call / rag_result / done 等节点推送）
 func (a *UnifiedAgent) runOnce(ctx context.Context, query string, opts ChatOptions, onEvent func(StreamEvent)) *Response {
+	if err := ctx.Err(); err != nil {
+		resp := &Response{Query: query, Error: err.Error(), Interrupted: true, Answer: "[已中断] 请求在开始前被取消"}
+		emit(onEvent, "error", map[string]string{"error": resp.Error})
+		emit(onEvent, "done", resp)
+		return resp
+	}
 	pr := a.prepare(ctx, query, opts)
 
 	resp := &Response{
@@ -95,17 +101,26 @@ func (a *UnifiedAgent) runOnce(ctx context.Context, query string, opts ChatOptio
 	emit(onEvent, "route", map[string]string{"mode": pr.mode})
 
 	// 检查 context 是否已取消（在分发前）
-	if ctx.Err() != nil {
+	if err := ctx.Err(); err != nil {
 		resp.Interrupted = true
+		resp.Error = err.Error()
 		resp.Answer = "[已中断] 请求在开始前被取消"
+		emit(onEvent, "error", map[string]string{"error": resp.Error})
 		emit(onEvent, "done", resp)
 		return resp
 	}
 
-	a.dispatch(ctx, pr, resp, onEvent)
-
-	if ctx.Err() != nil {
-		resp.Interrupted = true
+	err := a.dispatch(ctx, pr, resp, onEvent)
+	if err == nil {
+		err = ctx.Err()
+	}
+	if err != nil {
+		resp.Error = err.Error()
+		resp.Answer = "请求失败：" + err.Error()
+		resp.Interrupted = ctx.Err() != nil
+		emit(onEvent, "error", map[string]string{"error": resp.Error})
+		emit(onEvent, "done", resp)
+		return resp // 不将错误/半截生成写入答案记忆，也不生成交付文件
 	}
 
 	a.finalize(ctx, query, resp)
@@ -234,32 +249,40 @@ func (a *UnifiedAgent) reportIntent(query string) bool {
 
 // dispatch 按 mode 调对应 handler，把结果填回 resp。
 // 流式与非流式共用同一组 handler，由 onEvent 区分。
-func (a *UnifiedAgent) dispatch(ctx context.Context, pr preparedRequest, resp *Response, onEvent func(StreamEvent)) {
+func (a *UnifiedAgent) dispatch(ctx context.Context, pr preparedRequest, resp *Response, onEvent func(StreamEvent)) error {
+	var err error
 	switch pr.mode {
 	case "react":
 		// 普通 loop：只用工具 + skill，不允许子 Agent
-		answer, steps, task := a.runReAct(ctx, pr.query, pr.routeTools, pr.memPrefix, pr.histMsgs, onEvent, reactOpts{allowSubAgents: false})
+		answer, steps, task, runErr := a.runReAct(ctx, pr.query, pr.routeTools, pr.memPrefix, pr.histMsgs, onEvent, reactOpts{allowSubAgents: false})
 		resp.Answer, resp.Steps, resp.Task = answer, steps, task
+		err = runErr
 	case "rag_agent":
 		// 知识增强 + 报告意图：强制 Agentic RAG 子 Agent 流水线（research→writer→review→doc）
-		answer, steps, task := a.runReAct(ctx, pr.query, pr.routeTools, pr.memPrefix, pr.histMsgs, onEvent, reactOpts{allowSubAgents: true, forceSubAgentPlan: true})
+		answer, steps, task, runErr := a.runReAct(ctx, pr.query, pr.routeTools, pr.memPrefix, pr.histMsgs, onEvent, reactOpts{allowSubAgents: true, forceSubAgentPlan: true})
 		resp.Answer, resp.Steps, resp.Task = answer, steps, task
+		err = runErr
 	case "tool":
-		answer, tc := a.runTool(ctx, pr.query, pr.routeTools, pr.memPrefix, pr.histMsgs, onEvent)
+		answer, tc, runErr := a.runTool(ctx, pr.query, pr.routeTools, pr.memPrefix, pr.histMsgs, onEvent)
 		resp.Answer, resp.ToolCall = answer, tc
+		err = runErr
 	case "rag":
 		// RAG history rewriter 需要 userID 才能取到本用户 STM；
 		// 未登录请求 recentHistoryForRAG 返回 nil，rewriter 自动退化到原始 query。
 		userID := usercontext.UserIDFromContext(ctx)
-		answer, results := a.rag.QueryWithHistory(pr.query, a.recentHistoryForRAG(userID))
+		answer, results, runErr := a.rag.QueryWithHistory(ctx, pr.query, a.recentHistoryForRAG(userID))
+		if runErr != nil {
+			return runErr
+		}
 		resp.Answer, resp.SearchResults = answer, results
 		// RAG 暂不流式合成，但也通过事件回放结果以保持 SSE 输出形状一致
 		emit(onEvent, "rag_result", map[string]interface{}{"search_results": results})
 		emit(onEvent, "token", map[string]string{"content": answer})
 	default: // chat
 		systemPrompt := a.buildSystemPrompt(pr.memPrefix, "你是一个简洁的AI助手。结合你掌握的用户信息，使回答更个性化。")
-		resp.Answer = a.chatLLM(ctx, systemPrompt, pr.histMsgs, onEvent)
+		resp.Answer, err = a.chatLLM(ctx, systemPrompt, pr.histMsgs, onEvent)
 	}
+	return err
 }
 
 // finalize 完成 assistant 写回、异步记忆抽取、异步合并、事件发布、计数填充。

@@ -8,7 +8,6 @@ package skill
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strings"
 
 	skilldomain "agi-assistant/internal/domain/skill"
@@ -159,22 +158,11 @@ func (s *Service) toTool(sk skilldomain.Skill) tool.Tool {
 		Parameters:  params,
 		Execute: func(p map[string]interface{}) (string, error) {
 			logger.L().Info("skill: invoked (execute)", "skill", name)
-			out := s.llm.ChatFast(sysPrompt, []llm.Message{{Role: "user", Content: render(p)}})
-			if out == "[已中断]" {
-				return "", fmt.Errorf("skill %s interrupted", name)
-			}
-			return out, nil
+			return s.llm.ChatFast(sysPrompt, []llm.Message{{Role: "user", Content: render(p)}})
 		},
 		ExecuteCtx: func(ctx context.Context, p map[string]interface{}) (string, error) {
 			logger.C(ctx).Info("skill: invoked (execute-ctx)", "skill", name)
-			out := s.llm.ChatContextFast(ctx, sysPrompt, []llm.Message{{Role: "user", Content: render(p)}})
-			if ctx.Err() != nil {
-				return "", ctx.Err()
-			}
-			if out == "[已中断]" {
-				return "", fmt.Errorf("skill %s interrupted", name)
-			}
-			return out, nil
+			return s.llm.ChatContextFast(ctx, sysPrompt, []llm.Message{{Role: "user", Content: render(p)}})
 		},
 	}
 }

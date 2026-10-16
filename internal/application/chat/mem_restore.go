@@ -83,7 +83,12 @@ func (a *UnifiedAgent) restoreRAGFromDB() {
 // initKnowledgeGraph 初始化 Neo4j 知识图谱存储，并注入到 RAG 引擎 + GraphMemory
 func (a *UnifiedAgent) initKnowledgeGraph() {
 	kg := knowledge.NewKGStore(a.cfg, func(systemPrompt, userMsg string) string {
-		return a.llm.Chat(systemPrompt, []llm.Message{{Role: "user", Content: userMsg}})
+		reply, err := a.llm.Chat(systemPrompt, []llm.Message{{Role: "user", Content: userMsg}})
+		if err != nil {
+			logger.L().Warn("KG extraction LLM failed", "err", err)
+			return ""
+		}
+		return reply
 	})
 	a.kg = kg
 	a.rag.SetKGStore(kg)

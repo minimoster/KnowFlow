@@ -1,5 +1,7 @@
 # 对话模型配置
 llm:
+  # real 为默认；仅演示/离线测试显式设置 mock。缺少凭据会报错。
+  mode: real
   api_url: https://open.bigmodel.cn/api/paas/v4/chat/completions
   api_key: "."
   model: glm-5.1

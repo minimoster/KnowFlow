@@ -129,8 +129,11 @@ func (a *UnifiedAgent) llmPlanGraph(ctx context.Context, query string, ts map[st
 	if memPrefix != "" {
 		plannerBase = memPrefix + "\n\n" + plannerBase + "\n注意：用户偏好可能影响工具参数选择（如城市、时区等），请在参数中体现。"
 	}
-	raw := a.llm.ChatContextFast(ctx, plannerBase,
+	raw, err := a.llm.ChatContextFast(ctx, plannerBase,
 		[]llm.Message{{Role: "user", Content: planPrompt}})
+	if err != nil {
+		return a.rulePlanNodes(ctx, query, ts, memPrefix, allowSubAgents)
+	}
 
 	if ctx.Err() != nil {
 		return a.rulePlanNodes(ctx, query, ts, memPrefix, allowSubAgents)

@@ -120,7 +120,10 @@ func (a *UnifiedAgent) runMemExtractAndStore(userID, source, prompt string, impo
 	if userID == "" {
 		return
 	}
-	raw := a.llm.Chat("", []llm.Message{{Role: "user", Content: prompt}})
+	raw, err := a.llm.Chat("", []llm.Message{{Role: "user", Content: prompt}})
+	if err != nil {
+		return
+	}
 	raw = strings.TrimSpace(raw)
 	raw = strings.TrimPrefix(raw, "```json")
 	raw = strings.TrimPrefix(raw, "```")
@@ -248,7 +251,10 @@ func (a *UnifiedAgent) llmClassifyMemory(content string) (category string, tags 
 {"category":"identity|preference|fact|episodic|tool_failure|policy|general","tags":["tag1"],"slot_hint":"profile|planner|task_memory|tool_state|constraints|recall_memory"}
 
 记忆内容：` + content
-	raw := a.llm.Chat("", []llm.Message{{Role: "user", Content: prompt}})
+	raw, err := a.llm.Chat("", []llm.Message{{Role: "user", Content: prompt}})
+	if err != nil {
+		return "general", nil, ""
+	}
 	raw = strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(strings.TrimSpace(raw), "```json"), "```"))
 	var result struct {
 		Category string   `json:"category"`

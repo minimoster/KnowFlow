@@ -26,6 +26,7 @@ import (
 	"agi-assistant/internal/infrastructure/eventbus"
 	"agi-assistant/internal/infrastructure/persistence/ragchunk"
 	"agi-assistant/internal/pkg/logger"
+	"context"
 	"fmt"
 	"runtime/debug"
 	"strings"
@@ -96,7 +97,7 @@ type Engine struct {
 	rewriter Rewriter // nil 时跳过查询改写
 	reranker Reranker // nil 时跳过精排
 
-	generateFn func(systemPrompt string, userMsg string) string // LLM 回调，由 agent 注入
+	generateFn func(ctx context.Context, systemPrompt string, userMsg string) (string, error) // LLM 回调，由 agent 注入
 }
 
 // NewEngine 创建 RAG 引擎
@@ -129,12 +130,12 @@ func (e *Engine) SetKGStore(kg *knowledge.KGStore) {
 }
 
 // SetGenerateFn 注入 LLM 调用回调，供 Query 合成答案
-func (e *Engine) SetGenerateFn(fn func(systemPrompt string, userMsg string) string) {
+func (e *Engine) SetGenerateFn(fn func(ctx context.Context, systemPrompt string, userMsg string) (string, error)) {
 	e.generateFn = fn
 }
 
 // SetEmbedFn 注入 Embedding 回调，供 HybridStore 语义向量化
-func (e *Engine) SetEmbedFn(fn func(text string) ([]float64, error)) {
+func (e *Engine) SetEmbedFn(fn func(context.Context, string) ([]float64, error)) {
 	e.store.SetEmbedFn(fn)
 }
 
@@ -236,8 +237,8 @@ func (e *Engine) RestoreChunks(chunks []Chunk) {
 }
 
 // Query 检索知识库并返回答案和检索结果（不带历史，等价于 QueryWithHistory(q, nil)）
-func (e *Engine) Query(question string) (string, []SearchResult) {
-	return e.QueryWithHistory(question, nil)
+func (e *Engine) Query(question string) (string, []SearchResult, error) {
+	return e.QueryWithHistory(context.Background(), question, nil)
 }
 
 // QueryWithHistory 是 Query 的多轮版本：把对话历史交给 Rewriter 做 history-aware 改写
@@ -248,22 +249,31 @@ func (e *Engine) Query(question string) (string, []SearchResult) {
 //  3. Reranker 对融合后候选做精排，截到 cfg.TopK
 //  4. small-to-big：把命中的 chunk 替换为父块原文给 LLM 用
 //  5. LLM 合成
-func (e *Engine) QueryWithHistory(question string, history []HistoryMessage) (string, []SearchResult) {
+func (e *Engine) QueryWithHistory(ctx context.Context, question string, history []HistoryMessage) (string, []SearchResult, error) {
+	if err := ctx.Err(); err != nil {
+		return "", nil, err
+	}
 	if !e.Loaded {
-		return "知识库为空，请先上传文档。", nil
+		return "知识库为空，请先上传文档。", nil, nil
 	}
 
 	// 1) 查询改写
 	queries := []string{question}
 	if e.rewriter != nil {
-		rewritten := e.rewriter.Rewrite(question, history)
+		rewritten, err := e.rewriter.Rewrite(ctx, question, history)
+		if err != nil {
+			return "", nil, err
+		}
 		if len(rewritten) > 0 {
 			queries = rewritten
 		}
 	}
 
 	// 2) 多查询并发检索 + 跨查询 RRF 合并 + 可选 rerank（在 store 内部完成）
-	hybridResults := e.store.SearchMulti(queries, e.cfg.TopK)
+	hybridResults, err := e.store.SearchMulti(ctx, queries, e.cfg.TopK)
+	if err != nil {
+		return "", nil, err
+	}
 
 	results := make([]SearchResult, 0, len(hybridResults))
 	var parts []string
@@ -284,7 +294,7 @@ func (e *Engine) QueryWithHistory(question string, history []HistoryMessage) (st
 
 	context := strings.Join(parts, "\n\n")
 	if context == "" {
-		return "知识库中未找到相关内容。", results
+		return "知识库中未找到相关内容。", results, nil
 	}
 	if e.generateFn != nil {
 		systemPrompt := "你是一个基于知识库回答问题的助手。请仅根据提供的上下文内容回答问题，不要编造信息。如果上下文不足以回答，请说明。"
@@ -294,11 +304,11 @@ func (e *Engine) QueryWithHistory(question string, history []HistoryMessage) (st
 			askQuery = queries[0]
 		}
 		userMsg := fmt.Sprintf("上下文：\n%s\n\n问题：%s", context, askQuery)
-		answer := e.generateFn(systemPrompt, userMsg)
-		return answer, results
+		answer, err := e.generateFn(ctx, systemPrompt, userMsg)
+		return answer, results, err
 	}
 	// 无 LLM 时直接返回检索到的原文
-	return fmt.Sprintf("【知识库检索结果】\n%s", context), results
+	return fmt.Sprintf("【知识库检索结果】\n%s", context), results, nil
 }
 
 // Chunks 返回当前已持久化的切片预览（从 PG 加载，供状态接口使用）

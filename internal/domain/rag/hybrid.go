@@ -6,6 +6,7 @@ import (
 	"agi-assistant/internal/domain/knowledge"
 	"agi-assistant/internal/infrastructure/persistence/ragchunk"
 	"agi-assistant/internal/pkg/logger"
+	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
@@ -27,7 +28,7 @@ type HybridStore struct {
 	cfg      *config.APIConfig
 	chunks   ragchunk.Repo
 	kg       *knowledge.KGStore // 知识图谱，nil 时降级跳过
-	embedFn  func(text string) ([]float64, error)
+	embedFn  func(context.Context, string) ([]float64, error)
 	reranker Reranker // nil 时跳过精排
 	mode     string   // "hybrid" | "semantic" | "keyword" | "unavailable"
 }
@@ -63,7 +64,7 @@ func (hs *HybridStore) SetKGStore(kg *knowledge.KGStore) {
 }
 
 // SetEmbedFn 注入 Embedding 回调（由 agent 通过 llm.Embed 注入）
-func (hs *HybridStore) SetEmbedFn(fn func(text string) ([]float64, error)) {
+func (hs *HybridStore) SetEmbedFn(fn func(context.Context, string) ([]float64, error)) {
 	hs.embedFn = fn
 }
 
@@ -120,7 +121,7 @@ func (hs *HybridStore) IndexWithParentsAndMetadata(chunks []Chunk, parents []str
 		// Embedding 向量化
 		var emb []float64
 		if hs.embedFn != nil {
-			emb, _ = hs.embedFn(c.Content)
+			emb, _ = hs.embedFn(context.Background(), c.Content)
 		}
 		embJSON, _ := json.Marshal(emb)
 
@@ -184,6 +185,7 @@ func (hs *HybridStore) RestoreChunks(chunks []Chunk) {
 
 // HybridResult 是混合检索的单条结果
 type HybridResult struct {
+	PGID   int64   `json:"pg_id"` // 稳定的数据库 child ID；评测导出需映射回 corpus chunk_id
 	Chunk  Chunk   `json:"chunk"`
 	Score  float64 `json:"score"`
 	Source string  `json:"source"` // "hybrid" | "semantic" | "keyword" | "unavailable"
@@ -194,7 +196,7 @@ type HybridResult struct {
 
 // Search 单查询入口：根据当前模式执行检索；不做 rerank（向后兼容老调用方）
 func (hs *HybridStore) Search(query string, topK int) []HybridResult {
-	return hs.searchOne(query, topK, false)
+	return hs.searchOne(context.Background(), query, topK, false)
 }
 
 // SearchMulti 多查询入口：每条 query 独立做 RRF 三路检索，再按 pg_id 跨查询 RRF 合并，
@@ -204,12 +206,15 @@ func (hs *HybridStore) Search(query string, topK int) []HybridResult {
 //   - 每条 query 内部三路融合时取 fetchK = 4*topK，单条召回更充分
 //   - 跨查询合并继续用 RRF（rank-based 累加），消除不同 query 的分数尺度差异
 //   - 跨查询 RRF 之后只截一个较大的候选集（rerankPool），交给 reranker 精排回 topK
-func (hs *HybridStore) SearchMulti(queries []string, topK int) []HybridResult {
+func (hs *HybridStore) SearchMulti(ctx context.Context, queries []string, topK int) ([]HybridResult, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	if len(queries) == 0 {
-		return nil
+		return nil, nil
 	}
 	if len(queries) == 1 {
-		return hs.finalize(queries[0], hs.searchOne(queries[0], hs.rerankPool(topK), false), topK)
+		return hs.finalize(ctx, queries[0], hs.searchOne(ctx, queries[0], hs.rerankPool(topK), false), topK)
 	}
 
 	// 1) 多 query 并发各自 RRF 融合
@@ -225,7 +230,7 @@ func (hs *HybridStore) SearchMulti(queries []string, topK int) []HybridResult {
 		i, q := i, q
 		go func() {
 			defer wg.Done()
-			results[i] = queryResult{query: q, res: hs.searchOne(q, pool, false)}
+			results[i] = queryResult{query: q, res: hs.searchOne(ctx, q, pool, false)}
 		}()
 	}
 	wg.Wait()
@@ -264,14 +269,19 @@ func (hs *HybridStore) SearchMulti(queries []string, topK int) []HybridResult {
 		hr.Score = a.score
 		out = append(out, hr)
 	}
-	sort.Slice(out, func(i, j int) bool { return out[i].Score > out[j].Score })
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Score == out[j].Score {
+			return out[i].PGID < out[j].PGID
+		}
+		return out[i].Score > out[j].Score
+	})
 	if len(out) > pool {
 		out = out[:pool]
 	}
 
 	// 4) 用第一条 query（独立化后的版本）跑 rerank
 	primaryQuery := queries[0]
-	return hs.finalize(primaryQuery, out, topK)
+	return hs.finalize(ctx, primaryQuery, out, topK)
 }
 
 // rerankPool 召回阶段的候选池大小：rerank 在则 4×topK，否则 2×topK
@@ -287,25 +297,28 @@ func (hs *HybridStore) rerankPool(topK int) int {
 }
 
 // finalize 走 rerank（若有）并回填父块内容
-func (hs *HybridStore) finalize(query string, results []HybridResult, topK int) []HybridResult {
+func (hs *HybridStore) finalize(ctx context.Context, query string, results []HybridResult, topK int) ([]HybridResult, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	if hs.reranker != nil && len(results) > 1 {
-		results = hs.reranker.Rerank(query, results, topK)
+		return hs.reranker.Rerank(ctx, query, results, topK)
 	} else if topK > 0 && len(results) > topK {
 		results = results[:topK]
 	}
 	// 父块回填靠 LoadByIDs 已经把 ParentContent 一并取回（见 enrichWithParents）
-	return results
+	return results, nil
 }
 
 // ─────────────────────── 单查询：模式分发 ────────────────────────────────
 
 // searchOne 执行一次完整的三路 RRF 召回（不做 rerank）
-func (hs *HybridStore) searchOne(query string, topK int, _ bool) []HybridResult {
+func (hs *HybridStore) searchOne(ctx context.Context, query string, topK int, _ bool) []HybridResult {
 	switch hs.mode {
 	case "hybrid":
-		return hs.searchHybrid(query, topK)
+		return hs.searchHybrid(ctx, query, topK)
 	case "semantic":
-		return hs.searchSemantic(query, topK)
+		return hs.searchSemantic(ctx, query, topK)
 	case "keyword":
 		return hs.searchKeyword(query, topK)
 	default:
@@ -317,9 +330,9 @@ func (hs *HybridStore) searchOne(query string, topK int, _ bool) []HybridResult 
 // ─────────────────────── Hybrid: RRF 融合 ──────────────────────────────
 
 // searchHybrid: Milvus 语义 + ES BM25 + 知识图谱，使用 Reciprocal Rank Fusion 三路融合
-func (hs *HybridStore) searchHybrid(query string, topK int) []HybridResult {
+func (hs *HybridStore) searchHybrid(ctx context.Context, query string, topK int) []HybridResult {
 	// 查询向量化
-	queryEmb, err := hs.embedFn(query)
+	queryEmb, err := hs.embedFn(ctx, query)
 	if err != nil {
 		logger.L().Warn("query embed failed, falling back to keyword search", "err", err)
 		return hs.searchKeyword(query, topK)
@@ -349,7 +362,7 @@ func (hs *HybridStore) searchHybrid(query string, topK int) []HybridResult {
 	}
 	if esErr != nil {
 		logger.L().Warn("ES search failed, using semantic only", "err", esErr)
-		return hs.searchSemantic(query, topK)
+		return hs.searchSemantic(ctx, query, topK)
 	}
 
 	// Reciprocal Rank Fusion: score(d) = Σ w_i / (k + rank_i(d))
@@ -395,6 +408,9 @@ func (hs *HybridStore) searchHybrid(query string, topK int) []HybridResult {
 		sorted = append(sorted, idScore{id, score})
 	}
 	sort.Slice(sorted, func(i, j int) bool {
+		if sorted[i].score == sorted[j].score {
+			return sorted[i].id < sorted[j].id
+		}
 		return sorted[i].score > sorted[j].score
 	})
 	if topK < len(sorted) {
@@ -425,6 +441,7 @@ func (hs *HybridStore) searchHybrid(query string, topK int) []HybridResult {
 	for _, s := range sorted {
 		if ri, ok := rowMap[s.id]; ok {
 			results = append(results, HybridResult{
+				PGID:   s.id,
 				Chunk:  Chunk{Content: ri.content},
 				Score:  s.score,
 				Source: "hybrid",
@@ -438,8 +455,8 @@ func (hs *HybridStore) searchHybrid(query string, topK int) []HybridResult {
 // ─────────────────────── Semantic: Milvus ──────────────────────────────
 
 // searchSemantic: 仅 Milvus 语义向量检索
-func (hs *HybridStore) searchSemantic(query string, topK int) []HybridResult {
-	queryEmb, err := hs.embedFn(query)
+func (hs *HybridStore) searchSemantic(ctx context.Context, query string, topK int) []HybridResult {
+	queryEmb, err := hs.embedFn(ctx, query)
 	if err != nil {
 		logger.L().Warn("query embed failed", "err", err)
 		return nil
@@ -473,6 +490,7 @@ func (hs *HybridStore) searchSemantic(query string, topK int) []HybridResult {
 	for _, h := range hits {
 		if ri, ok := rowMap[h.ID]; ok {
 			results = append(results, HybridResult{
+				PGID:   h.ID,
 				Chunk:  Chunk{Content: ri.content},
 				Score:  float64(h.Distance),
 				Source: "semantic",
@@ -511,6 +529,7 @@ func (hs *HybridStore) searchKeyword(query string, topK int) []HybridResult {
 	for _, h := range hits {
 		if ri, ok := rowMap[h.PGID]; ok {
 			results = append(results, HybridResult{
+				PGID:   h.PGID,
 				Chunk:  Chunk{Content: ri.content},
 				Score:  h.Score,
 				Source: "keyword",

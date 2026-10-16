@@ -3,7 +3,11 @@
 
 Output:
   test.txt: 10,000 real article chunks from 1,250 public Juejin posts.
-  gold.txt: 50 queries, each with five relevant chunk IDs.
+  gold.txt: 50 queries with five automatically sampled CANDIDATE chunk IDs.
+
+WARNING: evenly spaced chunks and position-based grades are NOT evidence-based
+relevance labels. These legacy fields are retained for compatibility only.
+Use rag_eval.py prepare, review actual evidence, then validate before scoring.
 
 The construction follows test/测试rag要求.md: chunk size 200, overlap 50,
 10,035 candidate chunks followed by deterministic deletion of 35 non-gold
@@ -419,6 +423,8 @@ def build_outputs(documents: list[dict[str, Any]]) -> tuple[list[dict[str, Any]]
         gold.append(
             {
                 "query_id": f"q{query_index:03d}",
+                "label_status": "legacy_unreviewed",
+                "label_method": "evenly_spaced_sampling_not_relevance_judgment",
                 "question": make_question(document),
                 "ground_truth": relevant_ids,
                 "relevance": {chunk: (3 if rank == 0 else 2 if rank < 3 else 1) for rank, chunk in enumerate(relevant_ids)},

@@ -1,6 +1,7 @@
 package rag
 
 import (
+	"context"
 	"strings"
 	"testing"
 )
@@ -81,7 +82,10 @@ func TestParseRerankJSON_HandlesPlain(t *testing.T) {
 
 func TestLLMRewriter_FallbackOnNoLLM(t *testing.T) {
 	r := NewLLMRewriter(nil, 3)
-	got := r.Rewrite("你好", nil)
+	got, err := r.Rewrite(context.Background(), "你好", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(got) != 1 || got[0] != "你好" {
 		t.Errorf("expected fallback to original, got %v", got)
 	}
@@ -94,7 +98,10 @@ func TestLLMReranker_FallbackOnNoLLM(t *testing.T) {
 		{Chunk: Chunk{Content: "b"}, Score: 0.4},
 		{Chunk: Chunk{Content: "c"}, Score: 0.3},
 	}
-	got := r.Rerank("q", in, 2)
+	got, err := r.Rerank(context.Background(), "q", in, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(got) != 2 || got[0].Chunk.Content != "a" {
 		t.Errorf("expected truncate to topK, got %v", got)
 	}

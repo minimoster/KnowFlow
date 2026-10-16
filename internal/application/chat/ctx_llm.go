@@ -34,7 +34,7 @@ func emit(onEvent func(StreamEvent), eventType string, data interface{}) {
 //
 // 让 mode_chat / mode_tool / mode_react / RAG generator 等所有 LLM 调用点
 // 统一为单条代码路径，不再需要 sync/stream 双胞胎函数。
-func (a *UnifiedAgent) chatLLM(ctx context.Context, system string, msgs []llm.Message, onEvent func(StreamEvent)) string {
+func (a *UnifiedAgent) chatLLM(ctx context.Context, system string, msgs []llm.Message, onEvent func(StreamEvent)) (string, error) {
 	if onEvent == nil {
 		return a.llm.ChatContext(ctx, system, msgs)
 	}

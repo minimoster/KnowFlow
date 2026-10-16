@@ -1,0 +1,28 @@
+{
+  "kind": "fixture",
+  "mode": "hybrid_rerank",
+  "dataset_sha256": "f7826da550e9dde8389ff660fd40c05f9d919b85d8c2f759c541999e29cd4cd5",
+  "corpus_sha256": "dae6d9b0b96cf15057055d0e69ddbb9c647cd59be76437dfd961ca3ad4712eae",
+  "config": {
+    "revision": "fixture",
+    "embedding_model": "none",
+    "index_snapshot": "synthetic",
+    "top_k": 5,
+    "candidate_k": 20,
+    "rrf_k": 60,
+    "rewrite": false,
+    "kg": false,
+    "reranker": "synthetic"
+  },
+  "queries": [
+    {
+      "query_id": "fixture-1",
+      "ranked_chunk_ids": [
+        "b",
+        "a",
+        "c"
+      ],
+      "latency_ms": 0
+    }
+  ]
+}

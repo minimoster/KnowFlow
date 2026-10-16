@@ -40,7 +40,7 @@ func (a *UnifiedAgent) runReAct(
 	histMsgs []llm.Message,
 	onEvent func(StreamEvent),
 	opts reactOpts,
-) (string, []ReActStep, *TaskState) {
+) (string, []ReActStep, *TaskState, error) {
 	var reactSteps []ReActStep
 
 	// ── Step 1: 规划——rag_agent 强制固定子 Agent 流水线；否则走 Planner LLM ──
@@ -58,12 +58,15 @@ func (a *UnifiedAgent) runReAct(
 		reactSteps = append(reactSteps, thought)
 		emit(onEvent, "step", thought)
 
-		answer := a.chatLLM(ctx, systemPrompt, histMsgs, onEvent)
+		answer, err := a.chatLLM(ctx, systemPrompt, histMsgs, onEvent)
+		if err != nil {
+			return "", reactSteps, nil, err
+		}
 		reactSteps = append(reactSteps, ReActStep{Type: StepFinalAnswer, Content: answer})
 		if ctx.Err() != nil {
-			return "[已中断] 规划完成但生成被中断", reactSteps, nil
+			return "[已中断] 规划完成但生成被中断", reactSteps, nil, ctx.Err()
 		}
-		return answer, reactSteps, nil
+		return answer, reactSteps, nil, nil
 	}
 
 	// ── Step 2: 构建 TaskGraph ─────────────────────────────────────────
@@ -116,12 +119,31 @@ func (a *UnifiedAgent) runReAct(
 		task.Phase = "interrupted"
 		task.Status = "interrupted"
 		interruptMsg := a.buildInterruptMessageFromGraph(tg)
-		return "[已中断] " + interruptMsg, reactSteps, task
+		err := ctx.Err()
+		if err == nil {
+			err = fmt.Errorf("graph interrupted: %s", graphResult.InterruptedMsg)
+		}
+		return "[已中断] " + interruptMsg, reactSteps, task, err
 	}
 
 	// ── Step 5: Generator LLM 综合所有观察结果生成最终答案 ────────────────
 	task.Phase = "generating"
-	answer := a.llmGenerate(ctx, query, graphResult.Observations, memPrefix, histMsgs, onEvent)
+	for _, n := range tg.Nodes {
+		if n.Status == graph.StatusFailed || n.Status == graph.StatusCancelled {
+			task.Status, task.Phase = "failed", "failed"
+			a.saveSnapshot(task)
+			return "", reactSteps, task, fmt.Errorf("node %s failed: %s", n.ID, n.Error)
+		}
+	}
+	answer, err := a.llmGenerate(ctx, query, graphResult.Observations, memPrefix, histMsgs, onEvent)
+	if err != nil {
+		task.Status, task.Phase = "failed", "failed"
+		if ctx.Err() != nil {
+			task.Status, task.Phase = "interrupted", "interrupted"
+		}
+		a.saveSnapshot(task)
+		return "", reactSteps, task, err
+	}
 
 	// ── Step 5.5: 沙箱产物物化——把最终答案落成交付文件（挂载到宿主机桌面）──
 	if hostWS != "" {
@@ -131,11 +153,16 @@ func (a *UnifiedAgent) runReAct(
 		}
 	}
 
+	if err := ctx.Err(); err != nil {
+		task.Status, task.Phase = "interrupted", "interrupted"
+		a.saveSnapshot(task)
+		return "", reactSteps, task, err
+	}
 	reactSteps = append(reactSteps, ReActStep{Type: StepFinalAnswer, Content: answer})
 	task.Result = answer
 	task.Status = "completed"
 	task.Phase = "done"
-	return answer, reactSteps, task
+	return answer, reactSteps, task, nil
 }
 
 // ─────────────────────────── Graph → 旧结构适配 ───────────────────────────
@@ -237,13 +264,13 @@ func (a *UnifiedAgent) llmGenerate(
 	memPrefix string,
 	histMsgs []llm.Message,
 	onEvent func(StreamEvent),
-) string {
+) (string, error) {
 	if len(observations) == 0 {
 		systemPrompt := a.buildSystemPrompt(memPrefix, "你是一个简洁的AI助手。结合你掌握的用户信息，使回答更个性化。")
 		return a.chatLLM(ctx, systemPrompt, histMsgs, onEvent)
 	}
 	if !a.cfg.IsRealLLM() {
-		return "综合查询结果：" + strings.Join(observations, "；")
+		return "综合查询结果：" + strings.Join(observations, "；"), nil
 	}
 
 	var obsBuilder strings.Builder
@@ -292,7 +319,10 @@ func (a *UnifiedAgent) extractParamsForTool(ctx context.Context, query string, t
 		"从下面的用户消息中提取工具「%s」所需的参数，以JSON对象格式输出，只输出JSON，不加任何说明。\n\n参数说明：\n%s\n\n用户消息：%s",
 		t.Name, strings.Join(lines, "\n"), query,
 	)
-	raw := a.llm.ChatContextFast(ctx, "", []llm.Message{{Role: "user", Content: prompt}})
+	raw, err := a.llm.ChatContextFast(ctx, "", []llm.Message{{Role: "user", Content: prompt}})
+	if err != nil {
+		return result
+	}
 	raw = strings.TrimPrefix(raw, "```json")
 	raw = strings.TrimPrefix(raw, "```")
 	raw = strings.TrimSuffix(raw, "```")

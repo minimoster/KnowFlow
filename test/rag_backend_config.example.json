@@ -1,0 +1,14 @@
+{
+  "pg_dsn_env": "EXISTING_READ_ONLY_EVAL_PG_DSN",
+  "milvus_address": "REPLACE_WITH_EXISTING_EVAL_MILVUS_ADDRESS",
+  "es_addresses": ["REPLACE_WITH_EXISTING_EVAL_ES_URL"],
+  "es_username_env": "EXISTING_EVAL_ES_USERNAME",
+  "es_password_env": "EXISTING_EVAL_ES_PASSWORD",
+  "embedding_url": "REPLACE_WITH_EXISTING_EMBEDDING_ENDPOINT",
+  "embedding_key_env": "EXISTING_EMBEDDING_KEY",
+  "embedding_model": "REPLACE_WITH_EXACT_EMBEDDING_MODEL",
+  "rerank_url": "REPLACE_WITH_EXISTING_RERANK_CHAT_ENDPOINT",
+  "rerank_key_env": "EXISTING_RERANK_KEY",
+  "rerank_model": "REPLACE_WITH_EXACT_RERANK_MODEL",
+  "rerank_preview_len": 200
+}

@@ -1,0 +1,19 @@
+Failed to find real location of E:\miniconda\python.exe
+test_backend_mode_question_config_and_duplicates_refused (test_rag_data.DataChainTests.test_backend_mode_question_config_and_duplicates_refused) ... ok
+test_backend_pg_id_mapping_uses_child_fingerprint (test_rag_data.DataChainTests.test_backend_pg_id_mapping_uses_child_fingerprint) ... ok
+test_bridge_invocation_and_redacted_error (test_rag_data.DataChainTests.test_bridge_invocation_and_redacted_error) ... ok
+test_freeze_deterministic_and_never_overwrites (test_rag_data.DataChainTests.test_freeze_deterministic_and_never_overwrites) ... ok
+test_frozen_mapping_tamper_refused_even_with_updated_file_hash (test_rag_data.DataChainTests.test_frozen_mapping_tamper_refused_even_with_updated_file_hash) ... ok
+test_identical_content_different_documents_stays_distinct (test_rag_data.DataChainTests.test_identical_content_different_documents_stays_distinct) ... ok
+test_legacy_identity_not_guessed (test_rag_data.DataChainTests.test_legacy_identity_not_guessed) ... ok
+test_missing_duplicate_unknown_and_changed_pg_rows_refused (test_rag_data.DataChainTests.test_missing_duplicate_unknown_and_changed_pg_rows_refused) ... ok
+test_missing_opt_in_and_binary_drift_never_spawn (test_rag_data.DataChainTests.test_missing_opt_in_and_binary_drift_never_spawn) ... ok
+test_missing_sources_stay_pending_and_empty (test_rag_data.DataChainTests.test_missing_sources_stay_pending_and_empty) ... ok
+test_pending_export_keeps_failed_questions_without_scoring (test_rag_data.DataChainTests.test_pending_export_keeps_failed_questions_without_scoring) ... ok
+test_pending_export_to_blind_pool_keeps_labels_unreviewed (test_rag_data.DataChainTests.test_pending_export_to_blind_pool_keeps_labels_unreviewed) ... ok
+test_timeout_does_not_return_cached_or_mock_success (test_rag_data.DataChainTests.test_timeout_does_not_return_cached_or_mock_success) ... ok
+
+----------------------------------------------------------------------
+Ran 13 tests in 1.212s
+
+OK

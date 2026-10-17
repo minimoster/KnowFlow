@@ -1,0 +1,36 @@
+{"Time":"2026-10-17T23:32:57.0431765+08:00","Action":"start","Package":"agi-assistant/cmd/rag-export"}
+{"Time":"2026-10-17T23:32:58.6508013+08:00","Action":"run","Package":"agi-assistant/cmd/rag-export","Test":"TestExpectedBuildAndModelCheckedBeforeExecution"}
+{"Time":"2026-10-17T23:32:58.6508013+08:00","Action":"output","Package":"agi-assistant/cmd/rag-export","Test":"TestExpectedBuildAndModelCheckedBeforeExecution","Output":"=== RUN   TestExpectedBuildAndModelCheckedBeforeExecution\n"}
+{"Time":"2026-10-17T23:32:58.6513419+08:00","Action":"output","Package":"agi-assistant/cmd/rag-export","Test":"TestExpectedBuildAndModelCheckedBeforeExecution","Output":"--- PASS: TestExpectedBuildAndModelCheckedBeforeExecution (0.00s)\n"}
+{"Time":"2026-10-17T23:32:58.6513419+08:00","Action":"pass","Package":"agi-assistant/cmd/rag-export","Test":"TestExpectedBuildAndModelCheckedBeforeExecution","Elapsed":0}
+{"Time":"2026-10-17T23:32:58.6513419+08:00","Action":"run","Package":"agi-assistant/cmd/rag-export","Test":"TestExplicitOptInPrecedesSettingsAndInput"}
+{"Time":"2026-10-17T23:32:58.6513419+08:00","Action":"output","Package":"agi-assistant/cmd/rag-export","Test":"TestExplicitOptInPrecedesSettingsAndInput","Output":"=== RUN   TestExplicitOptInPrecedesSettingsAndInput\n"}
+{"Time":"2026-10-17T23:32:58.6513419+08:00","Action":"output","Package":"agi-assistant/cmd/rag-export","Test":"TestExplicitOptInPrecedesSettingsAndInput","Output":"--- PASS: TestExplicitOptInPrecedesSettingsAndInput (0.00s)\n"}
+{"Time":"2026-10-17T23:32:58.6513419+08:00","Action":"pass","Package":"agi-assistant/cmd/rag-export","Test":"TestExplicitOptInPrecedesSettingsAndInput","Elapsed":0}
+{"Time":"2026-10-17T23:32:58.6513419+08:00","Action":"run","Package":"agi-assistant/cmd/rag-export","Test":"TestInvalidRequestDoesNotReachRetriever"}
+{"Time":"2026-10-17T23:32:58.6513419+08:00","Action":"output","Package":"agi-assistant/cmd/rag-export","Test":"TestInvalidRequestDoesNotReachRetriever","Output":"=== RUN   TestInvalidRequestDoesNotReachRetriever\n"}
+{"Time":"2026-10-17T23:32:58.6513419+08:00","Action":"output","Package":"agi-assistant/cmd/rag-export","Test":"TestInvalidRequestDoesNotReachRetriever","Output":"--- PASS: TestInvalidRequestDoesNotReachRetriever (0.00s)\n"}
+{"Time":"2026-10-17T23:32:58.6513419+08:00","Action":"pass","Package":"agi-assistant/cmd/rag-export","Test":"TestInvalidRequestDoesNotReachRetriever","Elapsed":0}
+{"Time":"2026-10-17T23:32:58.6513419+08:00","Action":"run","Package":"agi-assistant/cmd/rag-export","Test":"TestExportUsesChildIDAndContentNotParent"}
+{"Time":"2026-10-17T23:32:58.6513419+08:00","Action":"output","Package":"agi-assistant/cmd/rag-export","Test":"TestExportUsesChildIDAndContentNotParent","Output":"=== RUN   TestExportUsesChildIDAndContentNotParent\n"}
+{"Time":"2026-10-17T23:32:58.6513419+08:00","Action":"output","Package":"agi-assistant/cmd/rag-export","Test":"TestExportUsesChildIDAndContentNotParent","Output":"--- PASS: TestExportUsesChildIDAndContentNotParent (0.00s)\n"}
+{"Time":"2026-10-17T23:32:58.6513419+08:00","Action":"pass","Package":"agi-assistant/cmd/rag-export","Test":"TestExportUsesChildIDAndContentNotParent","Elapsed":0}
+{"Time":"2026-10-17T23:32:58.6513419+08:00","Action":"run","Package":"agi-assistant/cmd/rag-export","Test":"TestExportRejectsBadHitsFailureAndLateCancel"}
+{"Time":"2026-10-17T23:32:58.6513419+08:00","Action":"output","Package":"agi-assistant/cmd/rag-export","Test":"TestExportRejectsBadHitsFailureAndLateCancel","Output":"=== RUN   TestExportRejectsBadHitsFailureAndLateCancel\n"}
+{"Time":"2026-10-17T23:32:58.6513419+08:00","Action":"output","Package":"agi-assistant/cmd/rag-export","Test":"TestExportRejectsBadHitsFailureAndLateCancel","Output":"--- PASS: TestExportRejectsBadHitsFailureAndLateCancel (0.00s)\n"}
+{"Time":"2026-10-17T23:32:58.6513419+08:00","Action":"pass","Package":"agi-assistant/cmd/rag-export","Test":"TestExportRejectsBadHitsFailureAndLateCancel","Elapsed":0}
+{"Time":"2026-10-17T23:32:58.6513419+08:00","Action":"run","Package":"agi-assistant/cmd/rag-export","Test":"TestSnapshotSelectOnlyAndNoPartialSuccess"}
+{"Time":"2026-10-17T23:32:58.6513419+08:00","Action":"output","Package":"agi-assistant/cmd/rag-export","Test":"TestSnapshotSelectOnlyAndNoPartialSuccess","Output":"=== RUN   TestSnapshotSelectOnlyAndNoPartialSuccess\n"}
+{"Time":"2026-10-17T23:32:58.6524253+08:00","Action":"output","Package":"agi-assistant/cmd/rag-export","Test":"TestSnapshotSelectOnlyAndNoPartialSuccess","Output":"--- PASS: TestSnapshotSelectOnlyAndNoPartialSuccess (0.00s)\n"}
+{"Time":"2026-10-17T23:32:58.6524253+08:00","Action":"pass","Package":"agi-assistant/cmd/rag-export","Test":"TestSnapshotSelectOnlyAndNoPartialSuccess","Elapsed":0}
+{"Time":"2026-10-17T23:32:58.6524253+08:00","Action":"run","Package":"agi-assistant/cmd/rag-export","Test":"TestLiveIdentityLookupDetectsConcurrentChanges"}
+{"Time":"2026-10-17T23:32:58.6524253+08:00","Action":"output","Package":"agi-assistant/cmd/rag-export","Test":"TestLiveIdentityLookupDetectsConcurrentChanges","Output":"=== RUN   TestLiveIdentityLookupDetectsConcurrentChanges\n"}
+{"Time":"2026-10-17T23:32:58.6524253+08:00","Action":"output","Package":"agi-assistant/cmd/rag-export","Test":"TestLiveIdentityLookupDetectsConcurrentChanges","Output":"--- PASS: TestLiveIdentityLookupDetectsConcurrentChanges (0.00s)\n"}
+{"Time":"2026-10-17T23:32:58.6524253+08:00","Action":"pass","Package":"agi-assistant/cmd/rag-export","Test":"TestLiveIdentityLookupDetectsConcurrentChanges","Elapsed":0}
+{"Time":"2026-10-17T23:32:58.6524253+08:00","Action":"run","Package":"agi-assistant/cmd/rag-export","Test":"TestRequestGarbageRejectedBeforeConfigRead"}
+{"Time":"2026-10-17T23:32:58.6524253+08:00","Action":"output","Package":"agi-assistant/cmd/rag-export","Test":"TestRequestGarbageRejectedBeforeConfigRead","Output":"=== RUN   TestRequestGarbageRejectedBeforeConfigRead\n"}
+{"Time":"2026-10-17T23:32:58.6524253+08:00","Action":"output","Package":"agi-assistant/cmd/rag-export","Test":"TestRequestGarbageRejectedBeforeConfigRead","Output":"--- PASS: TestRequestGarbageRejectedBeforeConfigRead (0.00s)\n"}
+{"Time":"2026-10-17T23:32:58.6524253+08:00","Action":"pass","Package":"agi-assistant/cmd/rag-export","Test":"TestRequestGarbageRejectedBeforeConfigRead","Elapsed":0}
+{"Time":"2026-10-17T23:32:58.6524253+08:00","Action":"output","Package":"agi-assistant/cmd/rag-export","Output":"PASS\n"}
+{"Time":"2026-10-17T23:32:58.6600787+08:00","Action":"output","Package":"agi-assistant/cmd/rag-export","Output":"ok  \tagi-assistant/cmd/rag-export\t1.617s\n"}
+{"Time":"2026-10-17T23:32:58.6600787+08:00","Action":"pass","Package":"agi-assistant/cmd/rag-export","Elapsed":1.617}

@@ -1,0 +1,17 @@
+{
+  "revision": "REPLACE_WITH_CLEAN_EXPORTER_BUILD_GIT_SHA",
+  "embedding_model": "REPLACE_WITH_EXACT_EMBEDDING_MODEL",
+  "index_snapshot": "REPLACE_WITH_FROZEN_INDEX_SNAPSHOT_ID",
+  "corpus_sha256": "COPY_FROM_FROZEN_MANIFEST",
+  "mapping_sha256": "COPY_FROM_FROZEN_MANIFEST",
+  "pg_snapshot_sha256": "COPY_FROM_FROZEN_MANIFEST",
+  "exporter_sha256": "SHA256_OF_BUILT_EXECUTABLE",
+  "backend_config_sha256": "SHA256_OF_PRIVATE_BACKEND_SETTINGS_FILE",
+  "top_k": 5,
+  "candidate_k": 20,
+  "rrf_k": 60,
+  "rewrite": false,
+  "kg": false,
+  "reranker": "REPLACE_WITH_EXACT_RERANK_MODEL",
+  "rerank_preview_len": 200
+}

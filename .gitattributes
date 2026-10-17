@@ -1,3 +1,5 @@
 # Evaluation fixtures contain byte-level SHA256 fingerprints.
 test/fixtures/rag_eval/* text eol=lf
 test/rag_review_queue.jsonl text eol=lf
+test/review_materials/** text eol=lf
+test/results/stage2_data_chain/** text eol=lf

@@ -370,6 +370,8 @@ npm run build
 
 ## 测试状态
 
+新增 [RAG 评测数据链路准备](test/RAG_DATA_CHAIN.md)：只读后端导出命令、冻结语料及 PGID 映射校验、待审题目三组导出适配器。当前 [40 题审阅材料](test/review_materials/stage2/REVIEW.md)仍缺对应原文，人工审定 0 题，尚无真实 RAG 效果结论；工具默认不连接后端或模型。
+
 第一阶段的离线故障验证、40 题证据审阅流程及三组检索评测入口见 [RAG 评测说明](test/RAG_EVALUATION.md)。旧 `test/gold.txt` 是未审定的自动候选标签，不能作为可信效果成绩。
 
 九项合成故障契约的固定版本对照为 0/9 → 8/9 → 9/9，原始日志已保留；该结果仅验证失败/取消传播，**不是 RAG 准确率提升**。40 题仍全部待人工审阅。双人盲审候选池、分歧门禁及失败复盘导出可通过 `test/rag_review.py` 运行；离线指标与审阅工具测试使用 `python -m unittest discover -s test -p 'test_rag*.py' -v`。

@@ -77,11 +77,11 @@ go test -p 1 -count=1 -timeout 90s ./internal/infrastructure/llm ./internal/appl
 
 fixture 三组结果刻意相同，只验证指标计算与文件协议；`report.json` 显著标记 `OFFLINE_FIXTURE_NOT_REAL_RETRIEVAL`，任何数值都不能写成真实优化成绩。
 
-尚待完成：原文语料与索引 ID 映射、40 题证据人工审阅、真实后端适配器装配及经预算确认的三组运行。引用溯源、拒答和大架构改造不在本阶段。
+后续数据链路已增加只读后端导出命令、冻结语料/ID 映射门禁和 Python 适配器，见 [RAG 数据链路准备](RAG_DATA_CHAIN.md)。尚待实际材料：原文语料及摄入身份、40 题证据人工审阅、已有冻结后端接入及经预算确认的三组运行。引用溯源、拒答和大架构改造不在本阶段。
 
 ## 双人证据审阅与失败复盘
 
-`rag_review.py pool` 合并三组命中和已有候选，并隐藏组名、排名、分数与旧等级；候选按固定哈希顺序展示。首次建池需要由检索导出器提供针对**待审问题文件**的三组原始结果及其哈希，不需要先评分；`rag_eval.py collect` 要求已审标签，因此只用于审阅完成后的实验，不能拿它给未审题评分。后端导出器的装配仍待完成。
+`rag_review.py pool` 合并三组命中和已有候选，并隐藏组名、排名、分数与旧等级；候选按固定哈希顺序展示。首次建池需要由检索导出器提供针对**待审问题文件**的三组原始结果及其哈希，不需要先评分；`rag_eval.py collect` 要求已审标签，因此只用于审阅完成后的实验，不能拿它给未审题评分。新增 `rag_backend_adapter.py` 提供待审题目导出入口，详见数据链路说明；真实后端未在本轮连接。
 
 ```console
 python test/rag_review.py pool --questions review.jsonl --corpus corpus.jsonl --runs vector.json hybrid.json hybrid_rerank.json --output packet.json

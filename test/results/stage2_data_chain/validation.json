@@ -1,0 +1,40 @@
+{
+  "kind": "OFFLINE_DATA_CHAIN_VALIDATION_NOT_REAL_RAG_RESULTS",
+  "base_commit": "bd0230f2f14b03fa016829cf895a4b009515e88c",
+  "go": {
+    "command": "go test -json -p 1 -count=1 -timeout 30s ./cmd/rag-export",
+    "exit_code": 0,
+    "passed_tests": 8,
+    "log": "go-test.jsonl",
+    "scope": "fake retriever and SQL mock; no sockets, model calls or service startup"
+  },
+  "python": {
+    "command": "python -m unittest discover -s test -p test_rag_data.py -v",
+    "exit_code": 0,
+    "passed_tests": 13,
+    "log": "python-unittest.txt",
+    "scope": "temporary synthetic corpus, mocked subprocess; includes pending export to blind pool and refusal to score unreviewed labels"
+  },
+  "evidence_readiness": {
+    "questions": 40,
+    "pending_review": 40,
+    "human_reviewed": 0,
+    "missing_candidate_chunks": 200,
+    "available_candidate_occurrences": 0
+  },
+  "not_executed": [
+    "Real backend connectivity/integration",
+    "Paid or free live model calls",
+    "Real corpus freezing (source corpus unavailable)",
+    "Actual index snapshot identity verification",
+    "Human evidence review",
+    "Real vector/hybrid/hybrid_rerank quality comparison",
+    "Previous-stage fault comparison rerun",
+    "Whole-repository regression"
+  ],
+  "notes": [
+    "Local validation cannot certify backend credentials, source authenticity, independent reviewer identity or remote index immutability.",
+    "Existing Go repository interfaces may ignore request cancellation; exporter has an outer subprocess timeout.",
+    "Synthetic tests are not RAG quality or performance improvements."
+  ]
+}

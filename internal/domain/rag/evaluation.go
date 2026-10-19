@@ -45,7 +45,10 @@ func (e *Engine) RetrieveForEvaluation(ctx context.Context, question, mode strin
 	if mode == "vector" {
 		hs.mode = "semantic"
 	}
-	results := hs.searchOne(ctx, question, candidateK, false)
+	results, err := hs.searchOne(ctx, question, candidateK)
+	if err != nil {
+		return nil, err
+	}
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -74,18 +77,18 @@ func (r *evaluationRepo) record(err error) {
 	}
 }
 func (r *evaluationRepo) failure() error { r.mu.Lock(); defer r.mu.Unlock(); return r.err }
-func (r *evaluationRepo) SearchMilvus(v []float32, k int) ([]ragchunk.MilvusHit, error) {
-	hits, err := r.Repo.SearchMilvus(v, k)
+func (r *evaluationRepo) SearchMilvus(ctx context.Context, v []float32, k int) ([]ragchunk.MilvusHit, error) {
+	hits, err := r.Repo.SearchMilvus(ctx, v, k)
 	r.record(err)
 	return hits, err
 }
-func (r *evaluationRepo) SearchES(q string, k int) ([]ragchunk.ESHit, error) {
-	hits, err := r.Repo.SearchES(q, k)
+func (r *evaluationRepo) SearchES(ctx context.Context, q string, k int) ([]ragchunk.ESHit, error) {
+	hits, err := r.Repo.SearchES(ctx, q, k)
 	r.record(err)
 	return hits, err
 }
-func (r *evaluationRepo) LoadByIDs(ids []int64) ([]ragchunk.Row, error) {
-	rows, err := r.Repo.LoadByIDs(ids)
+func (r *evaluationRepo) LoadByIDs(ctx context.Context, ids []int64) ([]ragchunk.Row, error) {
+	rows, err := r.Repo.LoadByIDs(ctx, ids)
 	r.record(err)
 	if err == nil {
 		requested := make(map[int64]bool, len(ids))

@@ -16,16 +16,16 @@ type evalRepo struct {
 }
 
 func (*evalRepo) MilvusAvailable() bool { return true }
-func (r *evalRepo) SearchMilvus([]float32, int) ([]ragchunk.MilvusHit, error) {
+func (r *evalRepo) SearchMilvus(context.Context, []float32, int) ([]ragchunk.MilvusHit, error) {
 	r.vectorCalls++
 	return []ragchunk.MilvusHit{{ID: 2, Distance: 1}, {ID: 1, Distance: .5}}, nil
 }
-func (r *evalRepo) SearchES(q string, k int) ([]ragchunk.ESHit, error) {
+func (r *evalRepo) SearchES(ctx context.Context, q string, k int) ([]ragchunk.ESHit, error) {
 	r.esCalls++
 	if r.esErr != nil {
 		return nil, r.esErr
 	}
-	return r.queryRepo.SearchES(q, k)
+	return r.queryRepo.SearchES(ctx, q, k)
 }
 
 func evaluationEngine(repo *evalRepo) *Engine {
@@ -84,7 +84,7 @@ func TestInvalidRerankIsAnError(t *testing.T) {
 
 func TestEvaluationRejectsMissingRows(t *testing.T) {
 	r := &evaluationRepo{Repo: queryRepo{}}
-	_, _ = r.LoadByIDs([]int64{1, 2, 3})
+	_, _ = r.LoadByIDs(context.Background(), []int64{1, 2, 3})
 	if r.failure() == nil {
 		t.Fatal("missing indexed row was silently dropped")
 	}

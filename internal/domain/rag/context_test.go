@@ -17,10 +17,10 @@ type queryRepo struct{ ragchunk.Repo }
 func (queryRepo) PGAvailable() bool     { return true }
 func (queryRepo) ESAvailable() bool     { return true }
 func (queryRepo) MilvusAvailable() bool { return false }
-func (queryRepo) SearchES(string, int) ([]ragchunk.ESHit, error) {
+func (queryRepo) SearchES(context.Context, string, int) ([]ragchunk.ESHit, error) {
 	return []ragchunk.ESHit{{PGID: 1, Score: 1}, {PGID: 2, Score: .5}}, nil
 }
-func (queryRepo) LoadByIDs([]int64) ([]ragchunk.Row, error) {
+func (queryRepo) LoadByIDs(context.Context, []int64) ([]ragchunk.Row, error) {
 	return []ragchunk.Row{{ID: 1, Content: "evidence one"}, {ID: 2, Content: "evidence two"}}, nil
 }
 

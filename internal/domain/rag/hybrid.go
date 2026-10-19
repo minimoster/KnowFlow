@@ -196,7 +196,11 @@ type HybridResult struct {
 
 // Search 单查询入口：根据当前模式执行检索；不做 rerank（向后兼容老调用方）
 func (hs *HybridStore) Search(query string, topK int) []HybridResult {
-	return hs.searchOne(context.Background(), query, topK, false)
+	results, err := hs.searchOne(context.Background(), query, topK)
+	if err != nil {
+		logger.L().Warn("legacy retrieval failed", "err", err)
+	}
+	return results
 }
 
 // SearchMulti 多查询入口：每条 query 独立做 RRF 三路检索，再按 pg_id 跨查询 RRF 合并，
@@ -214,13 +218,18 @@ func (hs *HybridStore) SearchMulti(ctx context.Context, queries []string, topK i
 		return nil, nil
 	}
 	if len(queries) == 1 {
-		return hs.finalize(ctx, queries[0], hs.searchOne(ctx, queries[0], hs.rerankPool(topK), false), topK)
+		results, err := hs.searchOne(ctx, queries[0], hs.rerankPool(topK))
+		if err != nil {
+			return nil, err
+		}
+		return hs.finalize(ctx, queries[0], results, topK)
 	}
 
 	// 1) 多 query 并发各自 RRF 融合
 	type queryResult struct {
 		query string
 		res   []HybridResult
+		err   error
 	}
 	results := make([]queryResult, len(queries))
 	var wg sync.WaitGroup
@@ -230,10 +239,19 @@ func (hs *HybridStore) SearchMulti(ctx context.Context, queries []string, topK i
 		i, q := i, q
 		go func() {
 			defer wg.Done()
-			results[i] = queryResult{query: q, res: hs.searchOne(ctx, q, pool, false)}
+			res, err := hs.searchOne(ctx, q, pool)
+			results[i] = queryResult{query: q, res: res, err: err}
 		}()
 	}
 	wg.Wait()
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	for _, qr := range results {
+		if qr.err != nil {
+			return nil, qr.err
+		}
+	}
 
 	// 2) 跨查询 RRF 合并：以 chunk content 哈希作为聚合键（PG ID 在 HybridResult 上未直出，
 	//    用 content 是稳健做法；同一 chunk 在多 query 中重复命中会被加分）
@@ -313,29 +331,39 @@ func (hs *HybridStore) finalize(ctx context.Context, query string, results []Hyb
 // ─────────────────────── 单查询：模式分发 ────────────────────────────────
 
 // searchOne 执行一次完整的三路 RRF 召回（不做 rerank）
-func (hs *HybridStore) searchOne(ctx context.Context, query string, topK int, _ bool) []HybridResult {
+func (hs *HybridStore) searchOne(ctx context.Context, query string, topK int) ([]HybridResult, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	switch hs.mode {
 	case "hybrid":
 		return hs.searchHybrid(ctx, query, topK)
 	case "semantic":
 		return hs.searchSemantic(ctx, query, topK)
 	case "keyword":
-		return hs.searchKeyword(query, topK)
+		return hs.searchKeyword(ctx, query, topK)
 	default:
-		logger.L().Warn("retrieval infrastructure unavailable (both Milvus and ES not connected)")
-		return nil
+		return nil, fmt.Errorf("retrieval infrastructure unavailable")
 	}
 }
 
 // ─────────────────────── Hybrid: RRF 融合 ──────────────────────────────
 
 // searchHybrid: Milvus 语义 + ES BM25 + 知识图谱，使用 Reciprocal Rank Fusion 三路融合
-func (hs *HybridStore) searchHybrid(ctx context.Context, query string, topK int) []HybridResult {
+func (hs *HybridStore) searchHybrid(ctx context.Context, query string, topK int) ([]HybridResult, error) {
 	// 查询向量化
+	if hs.embedFn == nil {
+		return nil, fmt.Errorf("embedding callback missing")
+	}
 	queryEmb, err := hs.embedFn(ctx, query)
 	if err != nil {
-		logger.L().Warn("query embed failed, falling back to keyword search", "err", err)
-		return hs.searchKeyword(query, topK)
+		return nil, fmt.Errorf("query embedding: %w", err)
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if len(queryEmb) == 0 {
+		return nil, fmt.Errorf("query embedding is empty")
 	}
 	queryEmb32 := make([]float32, len(queryEmb))
 	for i, v := range queryEmb {
@@ -348,21 +376,19 @@ func (hs *HybridStore) searchHybrid(ctx context.Context, query string, topK int)
 		fetchK = 10
 	}
 
-	milvusHits, milvusErr := hs.chunks.SearchMilvus(queryEmb32, fetchK)
-	esHits, esErr := hs.chunks.SearchES(query, fetchK)
-
-	if milvusErr != nil && esErr != nil {
-		logger.L().Warn("both Milvus and ES search failed",
-			"milvus_err", milvusErr, "es_err", esErr)
-		return nil
+	milvusHits, err := hs.chunks.SearchMilvus(ctx, queryEmb32, fetchK)
+	if err != nil {
+		return nil, fmt.Errorf("vector search: %w", err)
 	}
-	if milvusErr != nil {
-		logger.L().Warn("Milvus search failed, using keyword only", "err", milvusErr)
-		return hs.searchKeyword(query, topK)
+	if err := ctx.Err(); err != nil {
+		return nil, err
 	}
-	if esErr != nil {
-		logger.L().Warn("ES search failed, using semantic only", "err", esErr)
-		return hs.searchSemantic(ctx, query, topK)
+	esHits, err := hs.chunks.SearchES(ctx, query, fetchK)
+	if err != nil {
+		return nil, fmt.Errorf("keyword search: %w", err)
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
 	}
 
 	// Reciprocal Rank Fusion: score(d) = Σ w_i / (k + rank_i(d))
@@ -422,10 +448,9 @@ func (hs *HybridStore) searchHybrid(ctx context.Context, query string, topK int)
 	for _, s := range sorted {
 		ids = append(ids, s.id)
 	}
-	rows, err := hs.chunks.LoadByIDs(ids)
+	rows, err := hs.loadEvidence(ctx, ids)
 	if err != nil {
-		logger.L().Warn("load rag chunks from PG failed", "err", err)
-		return nil
+		return nil, err
 	}
 
 	type rowInfo struct {
@@ -449,34 +474,44 @@ func (hs *HybridStore) searchHybrid(ctx context.Context, query string, topK int)
 			})
 		}
 	}
-	return results
+	return results, nil
 }
 
 // ─────────────────────── Semantic: Milvus ──────────────────────────────
 
 // searchSemantic: 仅 Milvus 语义向量检索
-func (hs *HybridStore) searchSemantic(ctx context.Context, query string, topK int) []HybridResult {
+func (hs *HybridStore) searchSemantic(ctx context.Context, query string, topK int) ([]HybridResult, error) {
+	if hs.embedFn == nil {
+		return nil, fmt.Errorf("embedding callback missing")
+	}
 	queryEmb, err := hs.embedFn(ctx, query)
 	if err != nil {
-		logger.L().Warn("query embed failed", "err", err)
-		return nil
+		return nil, fmt.Errorf("query embedding: %w", err)
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if len(queryEmb) == 0 {
+		return nil, fmt.Errorf("query embedding is empty")
 	}
 	queryEmb32 := make([]float32, len(queryEmb))
 	for i, v := range queryEmb {
 		queryEmb32[i] = float32(v)
 	}
 
-	hits, err := hs.chunks.SearchMilvus(queryEmb32, topK)
+	hits, err := hs.chunks.SearchMilvus(ctx, queryEmb32, topK)
 	if err != nil {
-		logger.L().Warn("Milvus search failed", "err", err)
-		return nil
+		return nil, fmt.Errorf("vector search: %w", err)
 	}
 
 	var ids []int64
 	for _, h := range hits {
 		ids = append(ids, h.ID)
 	}
-	rows, _ := hs.chunks.LoadByIDs(ids)
+	rows, err := hs.loadEvidence(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
 	type rowInfo struct {
 		content string
 		parent  string
@@ -498,24 +533,26 @@ func (hs *HybridStore) searchSemantic(ctx context.Context, query string, topK in
 			})
 		}
 	}
-	return results
+	return results, nil
 }
 
 // ─────────────────────── Keyword: ES BM25 ──────────────────────────────
 
 // searchKeyword: 仅 Elasticsearch BM25 关键词检索
-func (hs *HybridStore) searchKeyword(query string, topK int) []HybridResult {
-	hits, err := hs.chunks.SearchES(query, topK)
+func (hs *HybridStore) searchKeyword(ctx context.Context, query string, topK int) ([]HybridResult, error) {
+	hits, err := hs.chunks.SearchES(ctx, query, topK)
 	if err != nil {
-		logger.L().Warn("ES search failed", "err", err)
-		return nil
+		return nil, fmt.Errorf("keyword search: %w", err)
 	}
 
 	var ids []int64
 	for _, h := range hits {
 		ids = append(ids, h.PGID)
 	}
-	rows, _ := hs.chunks.LoadByIDs(ids)
+	rows, err := hs.loadEvidence(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
 	type rowInfo struct {
 		content string
 		parent  string
@@ -537,5 +574,38 @@ func (hs *HybridStore) searchKeyword(query string, topK int) []HybridResult {
 			})
 		}
 	}
-	return results
+	return results, nil
+}
+
+// Empty hits are a valid search outcome. Missing/invalid authoritative rows and
+// dependency failures are not: never generate from a silently truncated result.
+func (hs *HybridStore) loadEvidence(ctx context.Context, ids []int64) ([]ragchunk.Row, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	rows, err := hs.chunks.LoadByIDs(ctx, ids)
+	if err != nil {
+		return nil, fmt.Errorf("load evidence: %w", err)
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	wanted := make(map[int64]bool, len(ids))
+	for _, id := range ids {
+		wanted[id] = true
+	}
+	seen := make(map[int64]bool, len(rows))
+	for _, row := range rows {
+		if !wanted[row.ID] || seen[row.ID] {
+			return nil, fmt.Errorf("invalid/duplicate stored chunk ID %d", row.ID)
+		}
+		seen[row.ID] = true
+	}
+	if len(seen) != len(wanted) {
+		return nil, fmt.Errorf("retrieval index references missing stored chunks")
+	}
+	return rows, nil
 }

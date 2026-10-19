@@ -195,7 +195,12 @@ func (a *UnifiedAgent) prepare(ctx context.Context, query string, opts ChatOptio
 	}
 
 	// 装配 Schema-driven 上下文前缀 + 对话历史
-	memPrefix := a.buildContextPrefix(ctx, query, mode)
+	// RAG's generation callback builds its own prefix after evidence is found.
+	// Do not recall/encode memory twice or do it for an empty knowledge base.
+	memPrefix := ""
+	if mode != "rag" {
+		memPrefix = a.buildContextPrefix(ctx, query, mode)
+	}
 	histMsgs := a.buildHistoryMessages(userID, query)
 
 	return preparedRequest{
@@ -213,8 +218,8 @@ func (a *UnifiedAgent) prepare(ctx context.Context, query string, opts ChatOptio
 //   - 知识增强开 + 简单问答   → rag（轻量检索问答）
 //   - 否则                    → react（普通 loop，无子 Agent）
 func (a *UnifiedAgent) routeDecide(query string, opts ChatOptions) (mode string, routeTools map[string]tool.Tool) {
-	if opts.UseRAG && a.rag.Loaded {
-		if a.reportIntent(query) {
+	if opts.UseRAG {
+		if a.rag != nil && a.rag.Loaded && a.reportIntent(query) {
 			return "rag_agent", nil
 		}
 		return "rag", nil
@@ -247,12 +252,18 @@ func (a *UnifiedAgent) dispatch(ctx context.Context, pr preparedRequest, resp *R
 		resp.Answer, resp.ToolCall = answer, tc
 		err = runErr
 	case "rag":
+		if a.rag == nil {
+			return fmt.Errorf("knowledge retrieval is not configured")
+		}
 		// RAG history rewriter 需要 userID 才能取到本用户 STM；
 		// 未登录请求 recentHistoryForRAG 返回 nil，rewriter 自动退化到原始 query。
 		userID := usercontext.UserIDFromContext(ctx)
 		answer, results, runErr := a.rag.QueryWithHistory(ctx, pr.query, a.recentHistoryForRAG(userID))
 		if runErr != nil {
 			return runErr
+		}
+		if err := ctx.Err(); err != nil {
+			return err
 		}
 		resp.Answer, resp.SearchResults = answer, results
 		// RAG 暂不流式合成，但也通过事件回放结果以保持 SSE 输出形状一致

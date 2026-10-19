@@ -66,10 +66,10 @@ type Repo interface {
 	InsertMilvus(pgIDs []int64, contents []string, embeddings [][]float32) error
 	// 读取
 	LoadAll() ([]Row, error)
-	LoadByIDs(ids []int64) ([]Row, error)
+	LoadByIDs(ctx context.Context, ids []int64) ([]Row, error)
 	// 检索
-	SearchES(query string, topK int) ([]ESHit, error)
-	SearchMilvus(vector []float32, topK int) ([]MilvusHit, error)
+	SearchES(ctx context.Context, query string, topK int) ([]ESHit, error)
+	SearchMilvus(ctx context.Context, vector []float32, topK int) ([]MilvusHit, error)
 	// 删除（按 doc_hash 级联删除三个存储）
 	Delete(docHash string) error
 	// 启动初始化（创建 collection / index）
@@ -139,9 +139,15 @@ func (s *Store) SavePGWithMetadata(docHash string, chunkIdx int, content, parent
 }
 
 // LoadByIDs 按 ID 列表批量读取 chunk（含父块原文）
-func (s *Store) LoadByIDs(ids []int64) ([]Row, error) {
-	if s.pg == nil || len(ids) == 0 {
-		return nil, fmt.Errorf("postgres not connected or empty ids")
+func (s *Store) LoadByIDs(ctx context.Context, ids []int64) ([]Row, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	if s.pg == nil {
+		return nil, fmt.Errorf("postgres not connected")
 	}
 	placeholders := make([]string, len(ids))
 	args := make([]interface{}, len(ids))
@@ -153,7 +159,7 @@ func (s *Store) LoadByIDs(ids []int64) ([]Row, error) {
 		"SELECT id, content, COALESCE(parent_content, ''), COALESCE(document_id, ''), COALESCE(version_id, ''), COALESCE(section, '') FROM rag_chunks WHERE id IN (%s)",
 		strings.Join(placeholders, ","),
 	)
-	rows, err := s.pg.Query(query, args...)
+	rows, err := s.pg.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -161,11 +167,15 @@ func (s *Store) LoadByIDs(ids []int64) ([]Row, error) {
 	var result []Row
 	for rows.Next() {
 		var r Row
-		if err := rows.Scan(&r.ID, &r.Content, &r.ParentContent, &r.DocumentID, &r.VersionID, &r.Section); err == nil {
-			result = append(result, r)
+		if err := rows.Scan(&r.ID, &r.Content, &r.ParentContent, &r.DocumentID, &r.VersionID, &r.Section); err != nil {
+			return nil, err
 		}
+		result = append(result, r)
 	}
-	return result, nil
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return result, ctx.Err()
 }
 
 // LoadAll 加载所有 chunk（启动期 TF 索引重建用）
@@ -246,7 +256,10 @@ func (s *Store) IndexES(pgID int64, content, docHash string, chunkIdx int) error
 }
 
 // SearchES 在 ES 上做 BM25 关键词检索
-func (s *Store) SearchES(query string, topK int) ([]ESHit, error) {
+func (s *Store) SearchES(ctx context.Context, query string, topK int) ([]ESHit, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	if s.es == nil {
 		return nil, fmt.Errorf("elasticsearch not connected")
 	}
@@ -256,6 +269,7 @@ func (s *Store) SearchES(query string, topK int) ([]ESHit, error) {
 		"_source": ["pg_id"]
 	}`, topK, query)
 	resp, err := s.es.Search(
+		s.es.Search.WithContext(ctx),
 		s.es.Search.WithIndex("rag_chunks"),
 		s.es.Search.WithBody(strings.NewReader(q)),
 	)
@@ -263,7 +277,14 @@ func (s *Store) SearchES(query string, topK int) ([]ESHit, error) {
 		return nil, err
 	}
 	defer resp.Body.Close()
+	if resp.IsError() {
+		return nil, fmt.Errorf("elasticsearch search HTTP %d", resp.StatusCode)
+	}
 	var result struct {
+		TimedOut bool `json:"timed_out"`
+		Shards   struct {
+			Failed int `json:"failed"`
+		} `json:"_shards"`
 		Hits struct {
 			Hits []struct {
 				ID     string  `json:"_id"`
@@ -277,11 +298,14 @@ func (s *Store) SearchES(query string, topK int) ([]ESHit, error) {
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, err
 	}
+	if result.TimedOut || result.Shards.Failed > 0 {
+		return nil, fmt.Errorf("elasticsearch search incomplete: timed_out=%t failed_shards=%d", result.TimedOut, result.Shards.Failed)
+	}
 	var hits []ESHit
 	for _, h := range result.Hits.Hits {
 		hits = append(hits, ESHit{PGID: h.Source.PGID, Score: h.Score})
 	}
-	return hits, nil
+	return hits, ctx.Err()
 }
 
 // ─────────────────────────────── Milvus ─────────────────────────────────────
@@ -362,13 +386,16 @@ func (s *Store) InsertMilvus(pgIDs []int64, contents []string, embeddings [][]fl
 }
 
 // SearchMilvus 在 Milvus 上做向量近邻检索（含距离分数）
-func (s *Store) SearchMilvus(vector []float32, topK int) ([]MilvusHit, error) {
+func (s *Store) SearchMilvus(ctx context.Context, vector []float32, topK int) ([]MilvusHit, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	if s.milvus == nil {
 		return nil, fmt.Errorf("milvus not connected")
 	}
 	sp, _ := entity.NewIndexFlatSearchParam()
 	results, err := s.milvus.Search(
-		context.Background(), "rag_chunks", []string{},
+		ctx, "rag_chunks", []string{},
 		"", []string{"pg_id"},
 		[]entity.Vector{entity.FloatVector(vector)},
 		"embedding", entity.L2,
@@ -379,12 +406,18 @@ func (s *Store) SearchMilvus(vector []float32, topK int) ([]MilvusHit, error) {
 	}
 	var hits []MilvusHit
 	for _, r := range results {
+		if r.Err != nil {
+			return nil, r.Err
+		}
+		if r.IDs == nil || r.IDs.Len() != len(r.Scores) {
+			return nil, fmt.Errorf("invalid Milvus search result")
+		}
 		ids := r.IDs.FieldData().GetScalars().GetLongData().Data
 		for i, id := range ids {
 			hits = append(hits, MilvusHit{ID: id, Distance: r.Scores[i]})
 		}
 	}
-	return hits, nil
+	return hits, ctx.Err()
 }
 
 // ─────────────────────────────── 删除（三路级联）───────────────────────────

@@ -253,6 +253,9 @@ func (e *Engine) QueryWithHistory(ctx context.Context, question string, history 
 	if err := ctx.Err(); err != nil {
 		return "", nil, err
 	}
+	if e.store.Mode() == "unavailable" {
+		return "", nil, fmt.Errorf("retrieval infrastructure unavailable")
+	}
 	if !e.Loaded {
 		return "知识库为空，请先上传文档。", nil, nil
 	}
@@ -280,18 +283,21 @@ func (e *Engine) QueryWithHistory(ctx context.Context, question string, history 
 	for _, hr := range hybridResults {
 		// 3) small-to-big：优先用父块原文做上下文
 		display := hr.Parent
-		if display == "" {
+		if strings.TrimSpace(display) == "" {
 			display = hr.Chunk.Content
 		}
 		results = append(results, SearchResult{
 			Chunk:      Chunk{ID: hr.Chunk.ID, Content: display},
 			Similarity: hr.Score,
 		})
-		if display != "" {
+		if strings.TrimSpace(display) != "" {
 			parts = append(parts, display)
 		}
 	}
 
+	if err := ctx.Err(); err != nil {
+		return "", nil, err
+	}
 	context := strings.Join(parts, "\n\n")
 	if context == "" {
 		return "知识库中未找到相关内容。", results, nil
@@ -305,7 +311,16 @@ func (e *Engine) QueryWithHistory(ctx context.Context, question string, history 
 		}
 		userMsg := fmt.Sprintf("上下文：\n%s\n\n问题：%s", context, askQuery)
 		answer, err := e.generateFn(ctx, systemPrompt, userMsg)
-		return answer, results, err
+		if err != nil {
+			return "", results, err
+		}
+		if err := ctx.Err(); err != nil {
+			return "", results, err
+		}
+		if strings.TrimSpace(answer) == "" {
+			return "", results, fmt.Errorf("answer generation returned empty content")
+		}
+		return answer, results, nil
 	}
 	// 无 LLM 时直接返回检索到的原文
 	return fmt.Sprintf("【知识库检索结果】\n%s", context), results, nil

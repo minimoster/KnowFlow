@@ -199,7 +199,7 @@ func main() {
 		if err := store.Init(memoryCtx); err != nil {
 			logger.L().Warn("memory milvus projection disabled", "err", err)
 		} else {
-			runWorker(memoryprojection.NewWorker(outboxRepo, milvusmemory.New(store),
+			runWorker(memoryprojection.NewWorker(outboxRepo, milvusmemory.New(store, memoryRepo),
 				memoryprojection.Config{WorkerID: "milvus-memory", BatchSize: 100, Lease: 30 * time.Second, MaxAttempts: 10}))
 			reconciler := memoryreconcile.New(memoryRepo, store, outboxRepo, "milvus", 500)
 			memoryWG.Add(1)
@@ -208,7 +208,7 @@ func main() {
 	}
 	if kg := a.KG(); kg != nil && kg.Available() {
 		store := neo4jmemory.NewNeo4jStore(kg.Client())
-		runWorker(memoryprojection.NewWorker(outboxRepo, neo4jmemory.New(store),
+		runWorker(memoryprojection.NewWorker(outboxRepo, neo4jmemory.New(store, memoryRepo),
 			memoryprojection.Config{WorkerID: "neo4j-memory", BatchSize: 100, Lease: 30 * time.Second, MaxAttempts: 10}))
 		reconciler := memoryreconcile.New(memoryRepo, store, outboxRepo, "neo4j", 500)
 		memoryWG.Add(1)

@@ -54,6 +54,9 @@ type MemoryRecord struct {
 }
 
 type OutboxEvent struct {
+	// ClaimToken fences acknowledgements to one lease, including worker restarts.
+	// It is transient queue metadata and must not enter projection payloads.
+	ClaimToken       string          `json:"-"`
 	ID               int64           `json:"id,omitempty"`
 	EventID          string          `json:"event_id"`
 	AggregateID      int64           `json:"aggregate_id"`

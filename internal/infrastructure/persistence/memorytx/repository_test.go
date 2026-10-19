@@ -287,7 +287,7 @@ func TestApplyConsolidationRollsBackWhenVersionChanged(t *testing.T) {
 	db, mock, _ := sqlmock.New()
 	defer db.Close()
 	mock.ExpectBegin()
-	mock.ExpectQuery(`SELECT id, version FROM long_term_memory`).WithArgs(sqlmock.AnyArg()).WillReturnRows(sqlmock.NewRows([]string{"id", "version"}).AddRow(1, 3))
+	mock.ExpectQuery(`FROM long_term_memory WHERE id = ANY`).WithArgs(sqlmock.AnyArg()).WillReturnRows(consolidationRows(1, 3))
 	mock.ExpectRollback()
 	_, err := memorytx.New(db).ApplyConsolidation(context.Background(), consistency.ConsolidationPlan{Deletes: []consistency.MemoryDelete{{ID: 1, UserID: "u1", ExpectedVersion: 2}}})
 	if !errors.Is(err, memorytx.ErrVersionConflict) {

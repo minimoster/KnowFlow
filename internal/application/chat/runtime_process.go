@@ -18,13 +18,13 @@ package chat
 import (
 	"agi-assistant/internal/domain/tool"
 	"agi-assistant/internal/infrastructure/llm"
-	"agi-assistant/internal/infrastructure/persistence/memorytx"
 	"agi-assistant/internal/pkg/logger"
 	"agi-assistant/internal/usercontext"
 	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 )
 
 // ─────────────────────────── 公开入口 ───────────────────────────
@@ -148,43 +148,23 @@ func (a *UnifiedAgent) prepare(ctx context.Context, query string, opts ChatOptio
 	// 命中 PII / Injection 直接 skip 并 log，不入 LTM 也不入图记忆。
 	if hasUser {
 		a.goSafe("process.preference-extract", func() {
+			// Post-response work is intentional, but bounded independently of request completion.
+			ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
+			defer cancel()
 			// 入口预检：含越狱/PII 模式的消息整体跳过 LLM 调用
 			if pre := inspectMemoryContent(query); !pre.Safe() {
 				logger.C(ctx).Warn("pref-extract rejected whole msg",
 					"risk", pre.Risk, "reason", pre.Reason)
 				return
 			}
-			kvs := a.llm.ExtractPreferences(query)
-			if len(kvs) == 0 {
+			kvs, err := a.llm.ExtractPreferencesContext(ctx, query)
+			if err != nil {
+				logger.C(ctx).Warn("preference extraction failed", "err", err)
 				return
 			}
-			a.mem.Pref(userID).SaveBatch(kvs)
 			for k, v := range kvs {
-				// 单条 k-v 复检
-				if insp := inspectKVPair(k, v); !insp.Safe() {
-					logger.C(ctx).Warn("pref-extract kv rejected",
-						"key", k, "risk", insp.Risk, "reason", insp.Reason)
-					continue
-				}
-				a.repos.pref.Save(userID, k, v)
-				content := fmt.Sprintf("用户%s: %s", k, v)
-				if insp := inspectMemoryContent(content); !insp.Safe() {
-					logger.C(ctx).Warn("pref-extract concat hit", "risk", insp.Risk)
-					continue
-				}
-				emb, _ := a.llm.Embed(content)
-				if _, err := a.commitMemory(ctx, memorytx.CreateCommand{
-					UserID:         userID,
-					Content:        content,
-					Importance:     0.8,
-					Embedding:      emb,
-					Category:       "preference",
-					Tags:           []string{"preference", "src:user"},
-					SlotHint:       "profile",
-					EmitGraphEdges: true,
-				}); err != nil {
-					logger.C(ctx).Warn("preference memory commit failed",
-						"user_id", userID, "key", k, "err", err)
+				if _, err := a.commitExtractedKV(ctx, userID, "user", k, v, 0.8, true); err != nil {
+					logger.C(ctx).Warn("preference memory skipped", "user_id", userID, "err", err)
 				}
 			}
 		})

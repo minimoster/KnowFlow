@@ -28,6 +28,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
+
+	"agi-assistant/internal/domain/memory/consistency"
 
 	"agi-assistant/internal/infrastructure/llm"
 	"agi-assistant/internal/infrastructure/persistence/memorytx"
@@ -120,7 +123,9 @@ func (a *UnifiedAgent) runMemExtractAndStore(userID, source, prompt string, impo
 	if userID == "" {
 		return
 	}
-	raw, err := a.llm.Chat("", []llm.Message{{Role: "user", Content: prompt}})
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	raw, err := a.llm.ChatContext(ctx, "", []llm.Message{{Role: "user", Content: prompt}})
 	if err != nil {
 		return
 	}
@@ -135,73 +140,68 @@ func (a *UnifiedAgent) runMemExtractAndStore(userID, source, prompt string, impo
 	}
 
 	for k, v := range kvs {
-		if k == "" || v == "" {
-			continue
-		}
-
-		// 闸门 1：单条 k-v 复检
-		if insp := inspectKVPair(k, v); !insp.Safe() {
-			logger.L().Warn("memory-extract kv rejected",
-				"source", source, "user_id", userID, "key", k,
-				"risk", insp.Risk, "reason", insp.Reason, "match", insp.Matched)
-			continue
-		}
-
-		// preference 表只接收 user-source 的 k-v——exchange 派生不算用户偏好
-		if source == "user" {
-			if pref := a.mem.Pref(userID); pref != nil {
-				pref.Save(k, v)
-			}
-			a.repos.pref.Save(userID, k, v)
-		}
-		content := fmt.Sprintf("用户%s: %s", k, v)
-		if source == "exchange" {
-			// reply 派生改用更中性的开头，避免被误当成"用户陈述"
-			content = fmt.Sprintf("%s: %s", k, v)
-		}
-
-		// 闸门 2：拼接后复检
-		if insp := inspectMemoryContent(content); !insp.Safe() {
-			logger.L().Warn("memory-extract concat hit",
-				"source", source, "user_id", userID, "risk", insp.Risk)
-			continue
-		}
-
-		// ── 分类管线：规则优先，LLM 兜底 ──
-		category, tags, slotHint := classifyMemoryContent(k, v)
-		if category == "" {
-			category, tags, slotHint = a.llmClassifyMemory(content)
-		}
-		// 来源标签：留下"这条记忆从哪条路径写入"的可追溯线索，便于审计与差异化召回
-		tags = appendUniqueTag(tags, "src:"+source)
-
-		emb, _ := a.llm.Embed(content)
-		record, err := a.commitMemory(context.Background(), memorytx.CreateCommand{
-			UserID:         userID,
-			Content:        content,
-			Importance:     importance,
-			Embedding:      emb,
-			Category:       category,
-			Tags:           tags,
-			SlotHint:       slotHint,
-			EmitGraphEdges: true,
-		})
+		record, err := a.commitExtractedKV(ctx, userID, source, k, v, importance, false)
 		if err != nil {
-			logger.L().Warn("memory-extract commit failed",
-				"source", source, "user_id", userID, "key", k, "err", err)
+			logger.L().Warn("memory-extract skipped", "source", source, "user_id", userID, "err", err)
 			continue
 		}
-		logger.L().Info("memory-extract stored",
-			"source", source, "user_id", userID, "key", k, "value", v,
-			"category", category, "importance", importance,
+		logger.L().Info("memory-extract stored", "source", source, "user_id", userID,
 			"memory_id", record.ID, "version", record.Version)
-
-		// 矛盾检测：仅对 identity/preference/fact 类启用，且必须真实入库（newID>0）
-		// 失败 / LLM 不可用时为 no-op，不影响主流程
 		if record.ID > 0 {
-			a.detectAndResolveConflict(context.Background(), userID, content, emb, category, int(record.ID))
+			a.detectAndResolveConflict(ctx, userID, record.Content, record.Embedding, record.Category, int(record.ID))
 		}
 	}
+}
+
+// commitExtractedKV gates all model-derived preferences before any mutation.
+// PostgreSQL + outbox commit precedes both LTM and preference cache visibility.
+// The legacy preference table remains a separate, best-effort projection.
+func (a *UnifiedAgent) commitExtractedKV(ctx context.Context, userID, source, k, v string, importance float64, preferenceOnly bool) (consistency.MemoryRecord, error) {
+	var empty consistency.MemoryRecord
+	if err := ctx.Err(); err != nil {
+		return empty, err
+	}
+	if userID == "" || strings.TrimSpace(k) == "" || strings.TrimSpace(v) == "" || (source != "user" && source != "exchange") {
+		return empty, fmt.Errorf("memory-extract: invalid identity, source or key/value")
+	}
+	if !inspectKVPair(k, v).Safe() {
+		return empty, fmt.Errorf("memory-extract: unsafe key/value")
+	}
+	content := fmt.Sprintf("用户%s: %s", k, v)
+	if source == "exchange" {
+		content = fmt.Sprintf("%s: %s", k, v)
+	}
+	if !inspectMemoryContent(content).Safe() {
+		return empty, fmt.Errorf("memory-extract: unsafe combined content")
+	}
+	category, tags, slotHint := classifyMemoryContent(k, v)
+	if preferenceOnly {
+		category, tags, slotHint = "preference", []string{"preference"}, "profile"
+	} else if category == "" {
+		category, tags, slotHint = a.llmClassifyMemory(ctx, content)
+	}
+	emb, err := a.llm.EmbedContext(ctx, content)
+	if err != nil {
+		return empty, fmt.Errorf("memory-extract: embedding: %w", err)
+	}
+	if len(emb) == 0 {
+		return empty, fmt.Errorf("memory-extract: empty embedding")
+	}
+	record, err := a.commitMemory(ctx, memorytx.CreateCommand{
+		UserID: userID, Content: content, Importance: importance, Embedding: emb,
+		EmbeddingModel: a.cfg.EmbeddingModel,
+		Category:       category, Tags: appendUniqueTag(tags, "src:"+source), SlotHint: slotHint, EmitGraphEdges: true,
+	})
+	if err != nil {
+		return empty, err
+	}
+	if source == "user" {
+		a.mem.Pref(userID).Save(k, v)
+		if a.repos.pref != nil {
+			a.repos.pref.Save(userID, k, v)
+		}
+	}
+	return record, nil
 }
 
 // appendUniqueTag 给 tags 切片追加一个不重复的标签
@@ -243,7 +243,7 @@ func containsAny(s string, subs ...string) bool {
 
 // llmClassifyMemory 调用一次 LLM 对记忆内容做 JSON 分类，
 // 返回 category / tags / slotHint；失败时回退到 "general"
-func (a *UnifiedAgent) llmClassifyMemory(content string) (category string, tags []string, slotHint string) {
+func (a *UnifiedAgent) llmClassifyMemory(ctx context.Context, content string) (category string, tags []string, slotHint string) {
 	if !a.cfg.IsRealLLM() {
 		return "general", nil, ""
 	}
@@ -251,7 +251,7 @@ func (a *UnifiedAgent) llmClassifyMemory(content string) (category string, tags 
 {"category":"identity|preference|fact|episodic|tool_failure|policy|general","tags":["tag1"],"slot_hint":"profile|planner|task_memory|tool_state|constraints|recall_memory"}
 
 记忆内容：` + content
-	raw, err := a.llm.Chat("", []llm.Message{{Role: "user", Content: prompt}})
+	raw, err := a.llm.ChatContext(ctx, "", []llm.Message{{Role: "user", Content: prompt}})
 	if err != nil {
 		return "general", nil, ""
 	}

@@ -400,16 +400,24 @@ func (c *Client) EmbedContext(ctx context.Context, text string) ([]float64, erro
 // ExtractPreferences 用 LLM 从用户消息中提取偏好键值对。
 // 返回 map[key]value；提取失败或无偏好时返回空 map。
 func (c *Client) ExtractPreferences(msg string) map[string]string {
-	if !c.cfg.IsRealLLM() {
-		return extractRuleBased(msg)
+	result, _ := c.ExtractPreferencesContext(context.Background(), msg)
+	return result
+}
+
+func (c *Client) ExtractPreferencesContext(ctx context.Context, msg string) (map[string]string, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if c.cfg.IsMockLLM() {
+		return extractRuleBased(msg), nil
 	}
 	prompt := `从下面这句用户消息中，提取所有用户的个人信息和偏好，输出 JSON 对象（key为中文名称，value为具体值）。
 				如果没有任何偏好信息，输出 {}。
 				只输出 JSON，不要有其他内容。
 				消息：` + msg
-	raw, err := c.callAPI("", []Message{{Role: "user", Content: prompt}})
+	raw, err := c.ChatContext(ctx, "", []Message{{Role: "user", Content: prompt}})
 	if err != nil {
-		return extractRuleBased(msg)
+		return nil, err
 	}
 	raw = strings.TrimSpace(raw)
 	// 去掉可能的 markdown 代码块包裹
@@ -419,9 +427,9 @@ func (c *Client) ExtractPreferences(msg string) map[string]string {
 	raw = strings.TrimSpace(raw)
 	var result map[string]string
 	if err := json.Unmarshal([]byte(raw), &result); err != nil {
-		return extractRuleBased(msg)
+		return nil, err
 	}
-	return result
+	return result, nil
 }
 
 // extractRuleBased 规则兜底：无 API 时使用

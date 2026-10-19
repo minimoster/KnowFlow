@@ -15,17 +15,17 @@ func TestClaimUsesSkipLockedAndReturnsClaimedEvents(t *testing.T) {
 	defer db.Close()
 	now := time.Now()
 	mock.ExpectBegin()
-	mock.ExpectQuery(`FOR UPDATE SKIP LOCKED`).WithArgs("milvus", 10).
+	mock.ExpectQuery(`FOR UPDATE SKIP LOCKED`).WithArgs("milvus", 10, time.Minute.Microseconds()).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "event_id", "aggregate_id", "user_id", "aggregate_version", "event_type", "target", "payload", "attempts", "created_at"}).
 			AddRow(1, "e1", 41, "u1", 2, "upsert_memory_vector", "milvus", []byte(`{}`), 0, now))
-	mock.ExpectExec(`UPDATE memory_outbox SET status = 'processing'`).WithArgs("w1", sqlmock.AnyArg(), sqlmock.AnyArg()).
+	mock.ExpectExec(`UPDATE memory_outbox SET status = 'processing'`).WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg()).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
 	events, err := memoryoutbox.New(db).Claim(context.Background(), consistency.TargetMilvus, "w1", 10, time.Minute)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(events) != 1 || events[0].EventID != "e1" {
+	if len(events) != 1 || events[0].EventID != "e1" || events[0].ClaimToken == "" {
 		t.Fatalf("events=%+v", events)
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {

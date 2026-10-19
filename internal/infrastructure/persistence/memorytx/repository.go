@@ -40,13 +40,22 @@ func (r *Repository) ApplyConsolidation(ctx context.Context, plan consistency.Co
 	}
 	ids := make([]int64, 0, len(plan.Updates)+len(plan.Deletes))
 	expected := map[int64]int64{}
+	users := map[int64]string{}
 	for _, u := range plan.Updates {
+		if u.Record.ID <= 0 || u.Record.UserID == "" || u.ExpectedVersion <= 0 || expected[u.Record.ID] != 0 {
+			return changes, fmt.Errorf("memorytx: invalid or duplicate consolidation update")
+		}
 		ids = append(ids, u.Record.ID)
 		expected[u.Record.ID] = u.ExpectedVersion
+		users[u.Record.ID] = u.Record.UserID
 	}
 	for _, d := range plan.Deletes {
+		if d.ID <= 0 || d.UserID == "" || d.ExpectedVersion <= 0 || expected[d.ID] != 0 {
+			return changes, fmt.Errorf("memorytx: invalid or duplicate consolidation delete")
+		}
 		ids = append(ids, d.ID)
 		expected[d.ID] = d.ExpectedVersion
+		users[d.ID] = d.UserID
 	}
 	if len(ids) == 0 {
 		return changes, nil
@@ -60,31 +69,33 @@ func (r *Repository) ApplyConsolidation(ctx context.Context, plan consistency.Co
 	defer func() {
 		if !committed {
 			_ = tx.Rollback()
+			changes = consistency.CommittedChangeSet{}
 		}
 	}()
-	rows, err := tx.QueryContext(ctx, `SELECT id, version FROM long_term_memory WHERE id = ANY($1) ORDER BY id FOR UPDATE`, pq.Array(ids))
+	rows, err := tx.QueryContext(ctx, `SELECT `+memoryColumns+` FROM long_term_memory WHERE id = ANY($1) ORDER BY id FOR UPDATE`, pq.Array(ids))
 	if err != nil {
 		return changes, err
 	}
-	seen := 0
-	for rows.Next() {
-		var id, version int64
-		if err = rows.Scan(&id, &version); err != nil {
-			rows.Close()
-			return changes, err
-		}
-		seen++
-		if expected[id] != version {
-			rows.Close()
+	records, err := scanRecords(rows)
+	if err != nil {
+		return changes, err
+	}
+	current := make(map[int64]consistency.MemoryRecord, len(records))
+	for _, record := range records {
+		if expected[record.ID] != record.Version || users[record.ID] != record.UserID || record.DeletedAt != nil {
 			return changes, ErrVersionConflict
 		}
+		current[record.ID] = record
 	}
-	rows.Close()
-	if seen != len(expected) {
+	if len(current) != len(expected) {
 		return changes, ErrVersionConflict
 	}
 	for _, u := range plan.Updates {
-		rec := u.Record
+		// Preserve authoritative identity, embedding provenance and safety fields;
+		// only the fields actually changed by consolidation come from the plan.
+		rec := current[u.Record.ID]
+		rec.Content, rec.Importance, rec.Embedding = u.Record.Content, u.Record.Importance, u.Record.Embedding
+		rec.Tags, rec.Supersedes, rec.LastAccessed = u.Record.Tags, u.Record.Supersedes, u.Record.LastAccessed
 		rec.Version = u.ExpectedVersion + 1
 		rec.UpdatedAt = time.Now()
 		rec.ContentHash, err = consistency.ComputeContentHash(rec)
@@ -92,11 +103,14 @@ func (r *Repository) ApplyConsolidation(ctx context.Context, plan consistency.Co
 			return changes, err
 		}
 		emb, _ := json.Marshal(rec.Embedding)
-		res, e := tx.ExecContext(ctx, `UPDATE long_term_memory SET content=$1,importance=$2,embedding=$3,version=$4,updated_at=$5,content_hash=$6 WHERE id=$7 AND version=$8`, rec.Content, rec.Importance, emb, rec.Version, rec.UpdatedAt, rec.ContentHash, rec.ID, u.ExpectedVersion)
+		res, e := tx.ExecContext(ctx, `UPDATE long_term_memory SET content=$1,importance=$2,embedding=$3,version=$4,updated_at=$5,content_hash=$6,tags=$7,supersedes=$8,last_accessed=$9 WHERE id=$10 AND version=$11`, rec.Content, rec.Importance, emb, rec.Version, rec.UpdatedAt, rec.ContentHash, pq.Array(rec.Tags), pq.Array(rec.Supersedes), rec.LastAccessed, rec.ID, u.ExpectedVersion)
 		if e != nil {
 			return changes, e
 		}
-		n, _ := res.RowsAffected()
+		n, e := res.RowsAffected()
+		if e != nil {
+			return changes, e
+		}
 		if n != 1 {
 			return changes, ErrVersionConflict
 		}
@@ -109,13 +123,21 @@ func (r *Repository) ApplyConsolidation(ctx context.Context, plan consistency.Co
 	}
 	for _, d := range plan.Deletes {
 		now := time.Now()
-		rec := consistency.MemoryRecord{ID: d.ID, UserID: d.UserID, Version: d.ExpectedVersion + 1, DeletedAt: &now, UpdatedAt: now}
-		rec.ContentHash, _ = consistency.ComputeContentHash(rec)
+		rec := current[d.ID]
+		rec.Version, rec.DeletedAt, rec.UpdatedAt = d.ExpectedVersion+1, &now, now
+		rec.Superseded, rec.SupersededAt = true, &now
+		rec.ContentHash, err = consistency.ComputeContentHash(rec)
+		if err != nil {
+			return changes, err
+		}
 		res, e := tx.ExecContext(ctx, `UPDATE long_term_memory SET deleted_at=$1,superseded=TRUE,superseded_at=$1,version=$2,updated_at=$1,content_hash=$3 WHERE id=$4 AND version=$5`, now, rec.Version, rec.ContentHash, d.ID, d.ExpectedVersion)
 		if e != nil {
 			return changes, e
 		}
-		n, _ := res.RowsAffected()
+		n, e := res.RowsAffected()
+		if e != nil {
+			return changes, e
+		}
 		if n != 1 {
 			return changes, ErrVersionConflict
 		}

@@ -19,16 +19,16 @@ type fakeOutbox struct {
 func (f *fakeOutbox) Claim(context.Context, consistency.Target, string, int, time.Duration) ([]consistency.OutboxEvent, error) {
 	return f.events, nil
 }
-func (f *fakeOutbox) MarkProcessed(_ context.Context, id string) error {
-	f.processed = append(f.processed, id)
+func (f *fakeOutbox) MarkProcessed(_ context.Context, e consistency.OutboxEvent) error {
+	f.processed = append(f.processed, e.EventID)
 	return nil
 }
-func (f *fakeOutbox) MarkRetry(_ context.Context, id, _ string, _ time.Time) error {
-	f.retried = append(f.retried, id)
+func (f *fakeOutbox) MarkRetry(_ context.Context, e consistency.OutboxEvent, _ string, _ time.Time) error {
+	f.retried = append(f.retried, e.EventID)
 	return nil
 }
-func (f *fakeOutbox) MarkDead(_ context.Context, id, _ string) error {
-	f.dead = append(f.dead, id)
+func (f *fakeOutbox) MarkDead(_ context.Context, e consistency.OutboxEvent, _ string) error {
+	f.dead = append(f.dead, e.EventID)
 	return nil
 }
 

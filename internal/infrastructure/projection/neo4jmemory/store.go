@@ -4,14 +4,17 @@ import (
 	"agi-assistant/internal/domain/memory/consistency"
 	pneo "agi-assistant/internal/infrastructure/platform/neo4j"
 	"context"
+	"errors"
 )
+
+var ErrUnavailable = errors.New("memory projection: neo4j unavailable")
 
 type Neo4jStore struct{ client *pneo.Client }
 
 func NewNeo4jStore(c *pneo.Client) *Neo4jStore { return &Neo4jStore{c} }
 func (s *Neo4jStore) Get(ctx context.Context, id int64) (consistency.ProjectionState, bool, error) {
 	if s.client == nil || !s.client.Available() {
-		return consistency.ProjectionState{}, false, nil
+		return consistency.ProjectionState{}, false, ErrUnavailable
 	}
 	sess := s.client.Session()
 	defer sess.Close(ctx)
@@ -28,25 +31,34 @@ func (s *Neo4jStore) Get(ctx context.Context, id int64) (consistency.ProjectionS
 }
 func (s *Neo4jStore) Upsert(ctx context.Context, r consistency.MemoryRecord) error {
 	if s.client == nil || !s.client.Available() {
-		return nil
+		return ErrUnavailable
 	}
 	sess := s.client.Session()
 	defer sess.Close(ctx)
-	_, err := sess.Run(ctx, `MERGE (m:Memory {memory_id:$id}) ON CREATE SET m.version=$version,m.content=$content,m.content_hash=$hash,m.user_id=$user ON MATCH SET m.version=CASE WHEN m.version <= $version THEN $version ELSE m.version END,m.content=CASE WHEN m.version <= $version THEN $content ELSE m.content END,m.content_hash=CASE WHEN m.version <= $version THEN $hash ELSE m.content_hash END`, map[string]any{"id": r.ID, "version": r.Version, "content": r.Content, "hash": r.ContentHash, "user": r.UserID})
+	res, err := sess.Run(ctx, `MERGE (m:Memory {memory_id:$id}) ON CREATE SET m.version=$version,m.content=$content,m.content_hash=$hash,m.user_id=$user ON MATCH SET m.version=CASE WHEN m.version <= $version THEN $version ELSE m.version END,m.content=CASE WHEN m.version <= $version THEN $content ELSE m.content END,m.content_hash=CASE WHEN m.version <= $version THEN $hash ELSE m.content_hash END`, map[string]any{"id": r.ID, "version": r.Version, "content": r.Content, "hash": r.ContentHash, "user": r.UserID})
+	if err != nil {
+		return err
+	}
+	// Consume completes the auto-commit transaction and surfaces deferred errors.
+	_, err = res.Consume(ctx)
 	return err
 }
 func (s *Neo4jStore) Delete(ctx context.Context, id, version int64) error {
 	if s.client == nil || !s.client.Available() {
-		return nil
+		return ErrUnavailable
 	}
 	sess := s.client.Session()
 	defer sess.Close(ctx)
-	_, err := sess.Run(ctx, `MATCH (m:Memory {memory_id:$id}) WHERE m.version <= $version DETACH DELETE m`, map[string]any{"id": id, "version": version})
+	res, err := sess.Run(ctx, `MATCH (m:Memory {memory_id:$id}) WHERE m.version <= $version DETACH DELETE m`, map[string]any{"id": id, "version": version})
+	if err != nil {
+		return err
+	}
+	_, err = res.Consume(ctx)
 	return err
 }
 func (s *Neo4jStore) ListPage(ctx context.Context, after int64, limit int) ([]consistency.ProjectionState, error) {
 	if s.client == nil || !s.client.Available() {
-		return nil, nil
+		return nil, ErrUnavailable
 	}
 	sess := s.client.Session()
 	defer sess.Close(ctx)

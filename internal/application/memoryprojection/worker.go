@@ -34,25 +34,39 @@ func NewWorker(repo Outbox, projector Projector, cfg Config) *Worker {
 }
 
 func (w *Worker) RunOnce(ctx context.Context) error {
+	// Start before Claim so no item in this batch runs beyond its lease.
+	ctx, cancel := context.WithTimeout(ctx, w.cfg.Lease)
+	defer cancel()
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	events, err := w.repo.Claim(ctx, w.projector.Target(), w.cfg.WorkerID, w.cfg.BatchSize, w.cfg.Lease)
 	if err != nil {
 		return err
 	}
 	for _, event := range events {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		applyErr := safeApply(ctx, w.projector, event)
+		// Interrupted jobs remain claimable after lease expiry. Shutdown is not
+		// an application failure and must not consume the retry/dead-letter budget.
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		if applyErr == nil {
-			if err := w.repo.MarkProcessed(ctx, event.EventID); err != nil {
+			if err := w.repo.MarkProcessed(ctx, event); err != nil {
 				return err
 			}
 			continue
 		}
 		if event.Attempts+1 >= w.cfg.MaxAttempts {
-			if err := w.repo.MarkDead(ctx, event.EventID, applyErr.Error()); err != nil {
+			if err := w.repo.MarkDead(ctx, event, applyErr.Error()); err != nil {
 				return err
 			}
 		} else {
 			backoff := time.Duration(1<<min(event.Attempts, 10)) * time.Second
-			if err := w.repo.MarkRetry(ctx, event.EventID, applyErr.Error(), time.Now().Add(backoff)); err != nil {
+			if err := w.repo.MarkRetry(ctx, event, applyErr.Error(), time.Now().Add(backoff)); err != nil {
 				return err
 			}
 		}

@@ -38,6 +38,9 @@ func (a *UnifiedAgent) commitMemory(ctx context.Context, cmd memorytx.CreateComm
 }
 
 func (a *UnifiedAgent) consolidateCommitted(ctx context.Context) error {
+	if a.repos == nil || a.repos.memoryTx == nil {
+		return fmt.Errorf("memory commit repository unavailable")
+	}
 	plan := a.mem.ltm.PlanConsolidation(time.Now())
 	if len(plan.Updates) == 0 && len(plan.Deletes) == 0 {
 		return nil

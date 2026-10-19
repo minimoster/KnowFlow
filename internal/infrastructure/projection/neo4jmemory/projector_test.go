@@ -22,12 +22,18 @@ func (f *fakeStore) Delete(_ context.Context, id, version int64) error {
 }
 func TestStaleUpsertDoesNotOverwriteNewerNode(t *testing.T) {
 	s := &fakeStore{state: consistency.ProjectionState{ID: 1, Version: 3, ContentHash: "v3"}}
-	p := New(s)
+	p := New(s, fakeAuthority{})
 	b, _ := json.Marshal(consistency.MemoryRecord{ID: 1, Version: 2, ContentHash: "v2"})
-	if err := p.Apply(context.Background(), consistency.OutboxEvent{Type: consistency.EventUpsertMemoryGraphNode, Payload: b}); err != nil {
+	if err := p.Apply(context.Background(), consistency.OutboxEvent{AggregateID: 1, AggregateVersion: 2, Target: consistency.TargetNeo4j, Type: consistency.EventUpsertMemoryGraphNode, Payload: b}); err != nil {
 		t.Fatal(err)
 	}
 	if s.state.Version != 3 {
 		t.Fatal("stale upsert overwrote v3")
 	}
+}
+
+type fakeAuthority struct{}
+
+func (fakeAuthority) LoadPage(context.Context, int64, int) ([]consistency.MemoryRecord, error) {
+	return []consistency.MemoryRecord{{ID: 1, Version: 4}}, nil
 }

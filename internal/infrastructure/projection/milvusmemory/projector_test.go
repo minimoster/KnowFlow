@@ -22,12 +22,18 @@ func (f *fakeStore) Delete(_ context.Context, id, version int64) error {
 }
 func TestStaleDeleteDoesNotRemoveNewerVector(t *testing.T) {
 	s := &fakeStore{state: consistency.ProjectionState{ID: 1, Version: 2}}
-	p := New(s)
+	p := New(s, fakeAuthority{})
 	b, _ := json.Marshal(consistency.MemoryRecord{ID: 1, Version: 1})
-	if err := p.Apply(context.Background(), consistency.OutboxEvent{Type: consistency.EventDeleteMemoryVector, Payload: b}); err != nil {
+	if err := p.Apply(context.Background(), consistency.OutboxEvent{AggregateID: 1, AggregateVersion: 1, Target: consistency.TargetMilvus, Type: consistency.EventDeleteMemoryVector, Payload: b}); err != nil {
 		t.Fatal(err)
 	}
 	if s.state.Version != 2 {
 		t.Fatal("stale delete removed v2")
 	}
+}
+
+type fakeAuthority struct{}
+
+func (fakeAuthority) LoadPage(context.Context, int64, int) ([]consistency.MemoryRecord, error) {
+	return []consistency.MemoryRecord{{ID: 1, Version: 4}}, nil
 }

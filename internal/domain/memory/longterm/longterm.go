@@ -24,13 +24,15 @@ import (
 
 // Item 是长期记忆的存储单元
 type Item struct {
-	ID           int       `json:"id"`
-	Content      string    `json:"content"`
-	Importance   float64   `json:"importance"` // 0~1，越高越重要
-	Embedding    []float64 `json:"embedding,omitempty"`
-	Score        float64   `json:"score,omitempty"` // 召回时的综合得分（不持久化）
-	CreatedAt    time.Time `json:"created_at"`
-	LastAccessed time.Time `json:"last_accessed"`
+	ID                int       `json:"id"`
+	Content           string    `json:"content"`
+	Importance        float64   `json:"importance"` // 0~1，越高越重要
+	Embedding         []float64 `json:"embedding,omitempty"`
+	EmbeddingModel    string    `json:"embedding_model,omitempty"`
+	EmbeddingRevision string    `json:"embedding_revision,omitempty"`
+	Score             float64   `json:"score,omitempty"` // 召回时的综合得分（不持久化）
+	CreatedAt         time.Time `json:"created_at"`
+	LastAccessed      time.Time `json:"last_accessed"`
 	// 多租户：每条记忆所属用户 ID（来自 JWT.subject）。RecallByFilter 强制按此过滤，
 	// 不传 UserID 的召回会得到空结果——避免 V1 升级期间出现"忘传 ID 就泄漏所有用户"的灾难。
 	// 老数据（迁移前 'legacy'）仍能被 user_id="legacy" 显式查询到，便于人工审计。
@@ -318,25 +320,27 @@ func recordToItem(record consistency.MemoryRecord) Item {
 		supersedes[i] = int(id)
 	}
 	return Item{
-		ID:               int(record.ID),
-		UserID:           record.UserID,
-		Content:          record.Content,
-		Importance:       record.Importance,
-		Embedding:        append([]float64(nil), record.Embedding...),
-		CreatedAt:        record.CreatedAt,
-		UpdatedAt:        record.UpdatedAt,
-		LastAccessed:     record.LastAccessed,
-		Category:         record.Category,
-		Tags:             append([]string(nil), record.Tags...),
-		SlotHint:         record.SlotHint,
-		Quarantined:      record.Quarantined,
-		QuarantineReason: record.QuarantineReason,
-		Superseded:       record.Superseded,
-		SupersededAt:     supersededAt,
-		Supersedes:       supersedes,
-		Version:          version,
-		ContentHash:      record.ContentHash,
-		DeletedAt:        record.DeletedAt,
+		ID:                int(record.ID),
+		UserID:            record.UserID,
+		Content:           record.Content,
+		Importance:        record.Importance,
+		Embedding:         append([]float64(nil), record.Embedding...),
+		EmbeddingModel:    record.EmbeddingModel,
+		EmbeddingRevision: record.EmbeddingRevision,
+		CreatedAt:         record.CreatedAt,
+		UpdatedAt:         record.UpdatedAt,
+		LastAccessed:      record.LastAccessed,
+		Category:          record.Category,
+		Tags:              append([]string(nil), record.Tags...),
+		SlotHint:          record.SlotHint,
+		Quarantined:       record.Quarantined,
+		QuarantineReason:  record.QuarantineReason,
+		Superseded:        record.Superseded,
+		SupersededAt:      supersededAt,
+		Supersedes:        supersedes,
+		Version:           version,
+		ContentHash:       record.ContentHash,
+		DeletedAt:         record.DeletedAt,
 	}
 }
 
@@ -355,25 +359,27 @@ func itemToRecord(item Item) consistency.MemoryRecord {
 		version = 1
 	}
 	return consistency.MemoryRecord{
-		ID:               int64(item.ID),
-		UserID:           item.UserID,
-		Content:          item.Content,
-		Importance:       item.Importance,
-		Embedding:        append([]float64(nil), item.Embedding...),
-		Category:         item.Category,
-		Tags:             append([]string(nil), item.Tags...),
-		SlotHint:         item.SlotHint,
-		Version:          version,
-		ContentHash:      item.ContentHash,
-		CreatedAt:        item.CreatedAt,
-		UpdatedAt:        item.UpdatedAt,
-		LastAccessed:     item.LastAccessed,
-		DeletedAt:        item.DeletedAt,
-		Quarantined:      item.Quarantined,
-		QuarantineReason: item.QuarantineReason,
-		Superseded:       item.Superseded,
-		SupersededAt:     supersededAt,
-		Supersedes:       supersedes,
+		ID:                int64(item.ID),
+		UserID:            item.UserID,
+		Content:           item.Content,
+		Importance:        item.Importance,
+		Embedding:         append([]float64(nil), item.Embedding...),
+		EmbeddingModel:    item.EmbeddingModel,
+		EmbeddingRevision: item.EmbeddingRevision,
+		Category:          item.Category,
+		Tags:              append([]string(nil), item.Tags...),
+		SlotHint:          item.SlotHint,
+		Version:           version,
+		ContentHash:       item.ContentHash,
+		CreatedAt:         item.CreatedAt,
+		UpdatedAt:         item.UpdatedAt,
+		LastAccessed:      item.LastAccessed,
+		DeletedAt:         item.DeletedAt,
+		Quarantined:       item.Quarantined,
+		QuarantineReason:  item.QuarantineReason,
+		Superseded:        item.Superseded,
+		SupersededAt:      supersededAt,
+		Supersedes:        supersedes,
 	}
 }
 
@@ -834,12 +840,16 @@ func appendUniqueInt(s []int, vals ...int) []int {
 // observed during planning so PostgreSQL can reject stale plans.
 func (m *LongTerm) PlanConsolidation(now time.Time) consistency.ConsolidationPlan {
 	m.mu.RLock()
-	items := make([]Item, len(m.Items))
-	for i := range m.Items {
-		items[i] = m.Items[i]
-		items[i].Embedding = append([]float64(nil), m.Items[i].Embedding...)
-		items[i].Tags = append([]string(nil), m.Items[i].Tags...)
-		items[i].Supersedes = append([]int(nil), m.Items[i].Supersedes...)
+	items := make([]Item, 0, len(m.Items))
+	for _, item := range m.Items {
+		// Inactive/quarantined content must not enter an active merged memory.
+		if item.Quarantined || item.Superseded || item.DeletedAt != nil {
+			continue
+		}
+		item.Embedding = append([]float64(nil), item.Embedding...)
+		item.Tags = append([]string(nil), item.Tags...)
+		item.Supersedes = append([]int(nil), item.Supersedes...)
+		items = append(items, item)
 	}
 	var cfg *ConsolidationConfig
 	if m.consolidationCfg != nil {
@@ -848,7 +858,7 @@ func (m *LongTerm) PlanConsolidation(now time.Time) consistency.ConsolidationPla
 	}
 	m.mu.RUnlock()
 
-	if cfg == nil || len(items) <= 1 {
+	if cfg == nil || len(items) == 0 {
 		return consistency.ConsolidationPlan{}
 	}
 	removed := make(map[int]bool)
@@ -857,7 +867,13 @@ func (m *LongTerm) PlanConsolidation(now time.Time) consistency.ConsolidationPla
 
 	const minDecayDelta = 0.01
 	for i := range items {
-		days := now.Sub(items[i].CreatedAt).Hours() / 24
+		// UpdatedAt is the last committed decay/content checkpoint. Never
+		// repeatedly apply the full age to an already-decayed importance.
+		checkpoint := items[i].UpdatedAt
+		if checkpoint.IsZero() {
+			checkpoint = items[i].CreatedAt
+		}
+		days := now.Sub(checkpoint).Hours() / 24
 		if days < 0 {
 			days = 0
 		}
@@ -879,6 +895,10 @@ func (m *LongTerm) PlanConsolidation(now time.Time) consistency.ConsolidationPla
 		for j := i + 1; j < len(items); j++ {
 			if removed[j] || items[i].UserID != items[j].UserID {
 				continue
+			}
+			if len(items[i].Embedding) > 0 && len(items[j].Embedding) > 0 &&
+				(items[i].EmbeddingModel != items[j].EmbeddingModel || items[i].EmbeddingRevision != items[j].EmbeddingRevision) {
+				continue // vector similarity/averaging requires matching provenance
 			}
 			similarity := itemSimilarityPure(items[i], items[j])
 			switch {

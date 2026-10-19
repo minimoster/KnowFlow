@@ -8,9 +8,9 @@ import (
 
 type Outbox interface {
 	Claim(context.Context, consistency.Target, string, int, time.Duration) ([]consistency.OutboxEvent, error)
-	MarkProcessed(context.Context, string) error
-	MarkRetry(context.Context, string, string, time.Time) error
-	MarkDead(context.Context, string, string) error
+	MarkProcessed(context.Context, consistency.OutboxEvent) error
+	MarkRetry(context.Context, consistency.OutboxEvent, string, time.Time) error
+	MarkDead(context.Context, consistency.OutboxEvent, string) error
 }
 
 type Projector interface {

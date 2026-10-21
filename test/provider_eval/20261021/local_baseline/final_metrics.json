@@ -1,0 +1,75 @@
+{
+  "scope": "Real local CPU inference on public BEIR SciFact; benchmark adapter, not deployed Chinese KnowFlow stack",
+  "unique_queries": 300,
+  "corpus_documents": 5183,
+  "positive_qrels": 339,
+  "modes": {
+    "vector": {
+      "hit_count": 223,
+      "queries": 300,
+      "hit_at_5": 0.7433333333333333,
+      "recall_at_5": 0.7312777777777778,
+      "mrr_at_5": 0.5978888888888889,
+      "warmed_backend_p95_ms": 5.361000003176741,
+      "warmed_outer_p95_ms": 5.715999999665655,
+      "warmed_timing_samples": 120,
+      "errors": 0
+    },
+    "hybrid": {
+      "hit_count": 233,
+      "queries": 300,
+      "hit_at_5": 0.7766666666666666,
+      "recall_at_5": 0.7556111111111111,
+      "mrr_at_5": 0.6328888888888888,
+      "warmed_backend_p95_ms": 13.00019999325741,
+      "warmed_outer_p95_ms": 13.246299989987165,
+      "warmed_timing_samples": 120,
+      "errors": 0
+    },
+    "hybrid_rerank": {
+      "hit_count": 231,
+      "queries": 300,
+      "hit_at_5": 0.77,
+      "recall_at_5": 0.7485,
+      "mrr_at_5": 0.6576111111111111,
+      "warmed_backend_p95_ms": 1158.4740999969654,
+      "warmed_outer_p95_ms": 1158.7532999983523,
+      "warmed_timing_samples": 120,
+      "errors": 0
+    }
+  },
+  "quality_attempts": 900,
+  "timing_attempts": 360,
+  "attempt_errors": 0,
+  "stable_repeated_rankings": 360,
+  "total_repeated_rankings": 360,
+  "external_model_http": 0,
+  "provider_api_cost_usd": 0,
+  "hardware_and_energy_cost_usd": null,
+  "local_inference_calls": 1844,
+  "run_seconds": 569.6723488999996,
+  "start_utc": "2026-10-21T03:51:43.271295+00:00",
+  "last_record_utc": "2026-10-21T04:01:12.888092+00:00",
+  "model_item_counts": {
+    "rerank": 8400,
+    "document_embedding": 5183,
+    "query_embedding": 1260,
+    "contract_probe": 4
+  },
+  "source_and_trace_hashes_verified": true,
+  "independent_metric_recomputation_passed": true,
+  "limitations": [
+    "Local exact cosine replaces Milvus approximate L2; normalized vectors make cosine/L2 ranking mathematically equivalent only for this chosen representation.",
+    "Local lexical tokenization/BM25 replaces Elasticsearch; the production analyzer/index was not run.",
+    "Quantized local MS MARCO cross-encoder replaces production chat listwise reranker; 512-token pair input replaces 200-character previews.",
+    "Warmed timing repeats 40 fixed queries three times per mode on one CPU session; it is not a concurrency/load benchmark or 120 independent questions.",
+    "Public qrels are independently supplied; no new human review or private Chinese-corpus result is claimed.",
+    "No dataset text, model weights, credentials or user private files are uploaded."
+  ],
+  "evidence": {
+    "plan.json": "4229550465b33a653df7ab7a55a28fe420c3e9f5e4d0158447f4a0b35093e483",
+    "trace.jsonl": "e58ea44be3f61ca306e05b2d4c41b0ea10e50a5e391d9332bccffbeb844272d8",
+    "report.json": "9e1bbc585de728c2f790e8efcab715185b6218b53a20da614cc2dceafab06d89",
+    "index_manifest.json": "448f23dbe25eaf1173bda3797f8fb2c932e8848ff1f3b6af6c3983b1a9918351"
+  }
+}

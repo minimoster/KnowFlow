@@ -1,0 +1,125 @@
+{
+  "metrics": {
+    "vector": {
+      "queries": 300,
+      "hit_count": 229,
+      "hit_at_5": 0.7633333333333333,
+      "recall_at_5": 0.744,
+      "mrr_at_5": 0.6455555555555555
+    },
+    "hybrid": {
+      "queries": 300,
+      "hit_count": 236,
+      "hit_at_5": 0.7866666666666666,
+      "recall_at_5": 0.7651666666666667,
+      "mrr_at_5": 0.6704444444444444
+    },
+    "hybrid_deepseek_rerank": {
+      "queries": 300,
+      "hit_count": 252,
+      "hit_at_5": 0.84,
+      "recall_at_5": 0.8268888888888889,
+      "mrr_at_5": 0.7297777777777777
+    }
+  },
+  "paired_hit_counts": {
+    "hybrid_vs_vector": {
+      "both_miss": 49,
+      "both_hit": 214,
+      "win": 22,
+      "loss": 15
+    },
+    "hybrid_deepseek_rerank_vs_hybrid": {
+      "both_miss": 39,
+      "both_hit": 227,
+      "loss": 9,
+      "win": 25
+    }
+  },
+  "DeepSeek_known_USD": "0.1844208",
+  "DeepSeek_unknown_held_USD": "0.3158016",
+  "DeepSeek_settled_and_held_USD": "0.5002224",
+  "actual_vendor_bill_known": false,
+  "returned_models": {
+    "deepseek-flash": 299
+  },
+  "fingerprints": {
+    "e72d3c7f663d3e1383b00b3884cb4501": 299
+  },
+  "successful_rerank_request_latency": {
+    "samples": 299,
+    "mean_ms": 2569.992067558793,
+    "p95_ms": 3295.9399999963352,
+    "scope": "successful provider requests plus persistence/validation; failure latency unavailable; no warmed timing, no full-query timing"
+  },
+  "original_start_utc": "2026-10-21T04:44:41.432267+00:00",
+  "dispatch_deadline_utc": "2026-10-21T05:43:41+00:00",
+  "end_utc": "2026-10-21T05:43:00.987625+00:00",
+  "schema_version": "provider-retrieval-final-v1",
+  "coverage": "all_300_queries_attempted_with_one_final_failure",
+  "dataset": "public BEIR SciFact; not Chinese production corpus",
+  "corpus_documents": 5183,
+  "planned_queries": 300,
+  "started_queries": 300,
+  "successful_queries": 299,
+  "failed_queries": 1,
+  "unstarted_queries": 0,
+  "macro_denominator_each_mode": 300,
+  "failure_policy": "qid 1137 remains empty-result zero Hit/Recall/MRR; no invented score or fallback",
+  "embedding_model": "embedding-3",
+  "embedding_dimensions": 2048,
+  "reranker_controls": {
+    "model": "deepseek-flash",
+    "thinking": "disabled",
+    "temperature": 0,
+    "max_tokens": 1024,
+    "candidates": 20,
+    "top_k": 5
+  },
+  "attempts": {
+    "embedding": 86,
+    "deepseek": 302,
+    "total": 388,
+    "rerank_valid_outputs": 299,
+    "SSL_unknown": 1,
+    "schema_failures": 2,
+    "retries": 2
+  },
+  "failure_lineage": {
+    "693": "first transport result/usage unknown; retry succeeded, original reservation retained",
+    "1137": "both original and retry returned only 19 of 20 scores; retained failure, not retried in final continuation"
+  },
+  "usage_known_receipts": {
+    "embedding": {
+      "prompt_tokens": 1850511,
+      "completion_tokens": 0,
+      "total_tokens": 1850511
+    },
+    "deepseek": {
+      "prompt_tokens": 318648,
+      "completion_tokens": 74022,
+      "total_tokens": 392670,
+      "prompt_cache_hit_tokens": 896,
+      "prompt_cache_miss_tokens": 317752
+    }
+  },
+  "missing_usage_receipts": {
+    "deepseek": 1
+  },
+  "embedding_known_conservative_CNY": "0.9252555",
+  "cost_basis": "all reported input at peak cache-miss price and output at documented output price; actual account bill unknown",
+  "window_end_utc": "2026-10-21T05:44:41Z",
+  "no_new_window": true,
+  "terminal_worker_exit_code": 0,
+  "task_related_processes_exited": true,
+  "source_result_sha256": "55f9633de3eea5af211911051a6d244a9d2713cbea948d5a6570835c8ccbe52c",
+  "frozen_payloads_sha256": "952ebb5c023862ba34f058585377629e6ac8bd7f31f46802e585d4bbf3e8889e",
+  "qrels_sha256": "0864bb985e0ca2367ba217977e72004d549054b2b06666ed9d4825ac7c21284c",
+  "limitations": [
+    "local exact cosine and BM25/RRF; not deployed Milvus/Elasticsearch",
+    "production listwise prompt/parser reused with strict 20-score completeness gate",
+    "request success is not relevance success or Agent task success",
+    "observed successful-request P95 excludes failures and is neither warmed nor full-query latency",
+    "retry/continuation decisions are disclosed; all failed attempts and costs retained"
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "schema_version": "sanitized-checkpoint-v1",
+  "repository": "minimoster/KnowFlow",
+  "visibility": "public",
+  "branch": "codex/scifact-eval-backup-20261021-044047",
+  "expected_head_to_recheck": "eaa45a7fadbc89538432fd14e6b23aeb55997cb4",
+  "destination_prefix": "test/provider_eval/20261021/",
+  "files": {
+    "provider/rerank_continue_03.py": {
+      "bytes": 10611,
+      "sha256": "d8a3eff2ce0cc3516c57be2672e5b32f49216d64ee11197262f9b3673ba25bfa"
+    },
+    "provider_results/final_300.json": {
+      "bytes": 4165,
+      "sha256": "79e2bdbf25197fee6adb3254b4b83316eeaf6674e9a30c1de4d7877eaa01fbe7"
+    },
+    "provider_results/query_scores_300.jsonl": {
+      "bytes": 117729,
+      "sha256": "07bcd44e32df6e7a2bb77fe84b3faaa692111d525fe16a7462969c18824b8f3c"
+    }
+  },
+  "contains_raw_text_or_provider_payloads": false
+}

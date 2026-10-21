@@ -1,0 +1,36 @@
+{
+  "schema_version": "sanitized-checkpoint-v1",
+  "publication_status": "prepared_not_uploaded",
+  "repository": "minimoster/KnowFlow",
+  "visibility": "public",
+  "branch": "codex/scifact-eval-backup-20261021-044047",
+  "expected_head_to_recheck": "04ba76fe71ae6cea6ce1f67cd9c30a960c4ffe16",
+  "destination_prefix": "test/provider_eval/20261021/",
+  "files": {
+    "provider/rerank_continue_01.py": {
+      "bytes": 9666,
+      "sha256": "ae6c75e778fa08633fac0adf8455b66ce6eceb3e7458b185b9625bd6531a7006"
+    },
+    "provider/test_rerank_continue_01.py": {
+      "bytes": 2578,
+      "sha256": "5941bf95ac81faff2f76615ecd418aa7e2aead182374fec65a3908c36f777467"
+    },
+    "provider/rerank_continue_02.py": {
+      "bytes": 10072,
+      "sha256": "1a207f9cac5d73bf1fe4c7bf2652e7340bc154f5fa286b2db25a278e903ea672"
+    },
+    "provider/test_rerank_continue_02.py": {
+      "bytes": 2618,
+      "sha256": "3dadc342461a96549eaf78201977a0e6863f00c227ffcb662bc0ff3a4f227e1b"
+    },
+    "provider_results/partial_236.json": {
+      "bytes": 3734,
+      "sha256": "0f88eef7ba8b7d0b097cecbec272f4fa4d5cb15ea3e902abe521226fbe60f84f"
+    },
+    "provider_results/query_scores_partial.jsonl": {
+      "bytes": 62328,
+      "sha256": "9ac5055804bd7601796c6bd578c92bc80cce3645889efae56358590d09366e08"
+    }
+  },
+  "contains_raw_text_or_provider_payloads": false
+}

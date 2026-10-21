@@ -1,0 +1,118 @@
+{
+  "metrics": {
+    "vector": {
+      "queries": 300,
+      "hit_count": 229,
+      "hit_at_5": 0.7633333333333333,
+      "recall_at_5": 0.744,
+      "mrr_at_5": 0.6455555555555555
+    },
+    "hybrid": {
+      "queries": 300,
+      "hit_count": 236,
+      "hit_at_5": 0.7866666666666666,
+      "recall_at_5": 0.7651666666666667,
+      "mrr_at_5": 0.6704444444444444
+    },
+    "hybrid_deepseek_rerank": {
+      "queries": 236,
+      "hit_count": 197,
+      "hit_at_5": 0.8347457627118644,
+      "recall_at_5": 0.8180790960451978,
+      "mrr_at_5": 0.7233050847457627
+    }
+  },
+  "usage": {
+    "embedding": {
+      "prompt_tokens": 1850511,
+      "completion_tokens": 0,
+      "total_tokens": 1850511
+    },
+    "initial_deepseek": {
+      "prompt_tokens": 155926,
+      "completion_tokens": 36408,
+      "total_tokens": 192334,
+      "prompt_cache_hit_tokens": 0,
+      "prompt_cache_miss_tokens": 155926
+    },
+    "continued_deepseek_1": {
+      "prompt_tokens": 93746,
+      "completion_tokens": 21636,
+      "total_tokens": 115382,
+      "prompt_cache_hit_tokens": 0,
+      "prompt_cache_miss_tokens": 93746
+    },
+    "continued_deepseek_2": {
+      "prompt_tokens": 1066,
+      "completion_tokens": 234,
+      "total_tokens": 1300,
+      "prompt_cache_hit_tokens": 896,
+      "prompt_cache_miss_tokens": 170
+    }
+  },
+  "DeepSeek_known_USD": "0.1451550",
+  "DeepSeek_unknown_held_USD": "0.3158016",
+  "actual_vendor_bill_known": false,
+  "returned_models": {
+    "deepseek-flash": 235
+  },
+  "fingerprints": {
+    "e72d3c7f663d3e1383b00b3884cb4501": 235
+  },
+  "successful_rerank_request_latency": {
+    "samples": 235,
+    "mean_ms": 2519.7739148937276,
+    "p95_ms": 3180.5762000003597,
+    "scope": "successful provider requests plus persistence/validation; failure latency unavailable; no warmed timing, no full-query timing"
+  },
+  "original_start_utc": "2026-10-21T04:44:41.432267+00:00",
+  "dispatch_deadline_utc": "2026-10-21T05:43:41.432267+00:00",
+  "end_utc": "2026-10-21T05:10:17.372859+00:00",
+  "schema_version": "provider-retrieval-partial-v1",
+  "status": "partial_stopped",
+  "dataset": "public BEIR SciFact; not Chinese production corpus",
+  "corpus_documents": 5183,
+  "planned_queries": 300,
+  "started_queries": 236,
+  "successful_queries": 235,
+  "failed_queries": 1,
+  "not_started_queries": 64,
+  "metric_denominators": {
+    "vector": 300,
+    "hybrid": 300,
+    "hybrid_deepseek_rerank": 236
+  },
+  "failure_policy": "failed started query gets zero Hit/Recall/MRR; unstarted gets null",
+  "embedding_model": "embedding-3",
+  "embedding_dimensions": 2048,
+  "reranker_controls": {
+    "model": "deepseek-flash",
+    "thinking": "disabled",
+    "temperature": 0,
+    "max_tokens": 1024,
+    "candidates": 20,
+    "top_k": 5
+  },
+  "attempts": {
+    "embedding": 86,
+    "deepseek": 238,
+    "total": 324,
+    "rerank_success": 235,
+    "SSL_unknown": 1,
+    "schema_failures": 2,
+    "retries": 2
+  },
+  "failure_accounting": {
+    "693": "SSL attempt unknown; later retry succeeded",
+    "1137": "two outputs each missing index 19; failed and never filled in"
+  },
+  "embedding_known_conservative_CNY": "0.9252555",
+  "result_sha256": "d32c00585dada0571091537566e0bccc452f0aeaf2932a61cfba9ff047f761f8",
+  "frozen_payloads_sha256": "952ebb5c023862ba34f058585377629e6ac8bd7f31f46802e585d4bbf3e8889e",
+  "limitations": [
+    "local exact cosine and BM25/RRF; not deployed Milvus/Elasticsearch",
+    "production chat rerank parser reused with strict 20-score completeness gate",
+    "partial rerank metrics are not full 300-query results and cannot directly be compared with the full baseline denominator",
+    "successful request latency excludes failures and is not warmed or full-query timing"
+  ]
+}

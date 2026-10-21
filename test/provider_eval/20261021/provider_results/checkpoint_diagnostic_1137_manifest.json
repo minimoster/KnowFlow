@@ -1,0 +1,28 @@
+{
+  "checkpoint": "single diagnostic plus post-hoc common 299-query subset",
+  "new_files_only": true,
+  "sealed_300_preserved": true,
+  "expected_parent_commit": "48fbc36166d83b66caeeba00103d47a3a855a707",
+  "files": {
+    "provider/diagnostic_1137_once.py": {
+      "bytes": 7268,
+      "sha256": "51100ac2a4583db08b9967a0a798c9f6dd6292274222ba425a99cd4a0f50c474"
+    },
+    "provider_results/posthoc_failure_excluded_299.json": {
+      "bytes": 5355,
+      "sha256": "17a438f621b101a2c48493226209d6eab9a62adaf20b67de33ec4dc383e48c6f"
+    },
+    "provider_results/query_scores_posthoc_299.jsonl": {
+      "bytes": 134409,
+      "sha256": "54dad2bbf2a4b17b508c14608a4fd09ad7ad3da5aeda58eac16994bc819767e7"
+    }
+  },
+  "excludes": [
+    "raw documents and queries",
+    "prompts and responses",
+    "credentials and private launchers",
+    "personal paths",
+    "chat and approval records",
+    "models and caches"
+  ]
+}

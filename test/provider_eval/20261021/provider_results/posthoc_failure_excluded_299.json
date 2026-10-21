@@ -1,0 +1,172 @@
+{
+  "analysis": "post-hoc failure-excluded subset; not an unbiased replacement benchmark",
+  "excluded_query_ids": [
+    "1137"
+  ],
+  "denominator": 299,
+  "same_query_ids_for_all_arms": true,
+  "query_id_list_sha256": "f5e1012f03fff59328e9550ed0ddc9dfdbdb6b3243f12653f37d69942aa456d0",
+  "macro_definition": "Hit: mean(any relevant in top5); Recall: mean(relevant retrieved / all positive qrels for query); MRR: mean(reciprocal rank of first relevant within top5). All arms share 299 retained query IDs.",
+  "metrics": {
+    "vector": {
+      "queries": 299,
+      "hit_count": 228,
+      "hit_at_5": 0.7625418060200669,
+      "recall_at_5": 0.7431438127090301,
+      "mrr_at_5": 0.6460423634336678
+    },
+    "hybrid": {
+      "queries": 299,
+      "hit_count": 235,
+      "hit_at_5": 0.7859531772575251,
+      "recall_at_5": 0.76438127090301,
+      "mrr_at_5": 0.6693422519509477
+    },
+    "hybrid_deepseek_rerank": {
+      "queries": 299,
+      "hit_count": 252,
+      "hit_at_5": 0.842809364548495,
+      "recall_at_5": 0.829654403567447,
+      "mrr_at_5": 0.7322185061315496
+    }
+  },
+  "paired_hit_counts": {
+    "hybrid_vs_vector": {
+      "both_miss": 49,
+      "both_hit": 213,
+      "win": 22,
+      "loss": 15
+    },
+    "hybrid_deepseek_rerank_vs_hybrid": {
+      "both_miss": 39,
+      "both_hit": 227,
+      "loss": 8,
+      "win": 25
+    }
+  },
+  "excluded_query_original_metrics": {
+    "vector": {
+      "hit_at_5": 1.0,
+      "recall_at_5": 1.0,
+      "mrr_at_5": 0.5
+    },
+    "hybrid": {
+      "hit_at_5": 1.0,
+      "recall_at_5": 1.0,
+      "mrr_at_5": 1.0
+    },
+    "hybrid_deepseek_rerank": {
+      "hit_at_5": 0.0,
+      "recall_at_5": 0.0,
+      "mrr_at_5": 0.0
+    }
+  },
+  "sealed_300_metrics": {
+    "vector": {
+      "queries": 300,
+      "hit_count": 229,
+      "hit_at_5": 0.7633333333333333,
+      "recall_at_5": 0.744,
+      "mrr_at_5": 0.6455555555555555
+    },
+    "hybrid": {
+      "queries": 300,
+      "hit_count": 236,
+      "hit_at_5": 0.7866666666666666,
+      "recall_at_5": 0.7651666666666667,
+      "mrr_at_5": 0.6704444444444444
+    },
+    "hybrid_deepseek_rerank": {
+      "queries": 300,
+      "hit_count": 252,
+      "hit_at_5": 0.84,
+      "recall_at_5": 0.8268888888888889,
+      "mrr_at_5": 0.7297777777777777
+    }
+  },
+  "sealed_300_unchanged": true,
+  "diagnostic": {
+    "query_id": "1137",
+    "verdict": "invalid",
+    "validation_condition": "incomplete scores",
+    "score_coverage": {
+      "rows": 19,
+      "indices": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18
+      ],
+      "missing": [
+        19
+      ],
+      "duplicate_indices": [],
+      "unexpected_indices": [],
+      "valid_complete": false,
+      "validation_condition": "incomplete scores"
+    },
+    "usage": {
+      "prompt_tokens": 1066,
+      "completion_tokens": 234,
+      "total_tokens": 1300,
+      "prompt_tokens_details": {
+        "cached_tokens": 896
+      },
+      "prompt_cache_hit_tokens": 896,
+      "prompt_cache_miss_tokens": 170
+    },
+    "model": "deepseek-flash",
+    "system_fingerprint": "e72d3c7f663d3e1383b00b3884cb4501",
+    "known_cost_USD": "0.0006006",
+    "new_dispatch_attempts": 1,
+    "elapsed_ms": 2571.281700002146,
+    "end_utc": "2026-10-21T05:59:00.710989+00:00"
+  },
+  "diagnostic_pre_transport_utc": "2026-10-21T05:58:58.138244+00:00",
+  "diagnostic_timeout_seconds": 30,
+  "original_window_reopened": false,
+  "cumulative": {
+    "embedding_HTTP": 86,
+    "DeepSeek_HTTP": 303,
+    "all_provider_HTTP": 389,
+    "DeepSeek_known_conservative_USD": "0.1850214",
+    "DeepSeek_unknown_reserve_USD": "0.3158016",
+    "DeepSeek_settled_plus_reserved_USD": "0.5008230",
+    "DeepSeek_cap_USD": "2",
+    "Zhipu_known_conservative_CNY": "0.9252555",
+    "prior_risk_and_unreconciled_envelopes_USD": "4",
+    "bookkeeping_USD_per_CNY": "0.25",
+    "cumulative_book_USD": "4.732136875",
+    "actual_vendor_bill_known": false
+  },
+  "limitations": [
+    "Public English SciFact adapter benchmark; not Chinese deployed KnowFlow performance.",
+    "Exclusion was chosen after observing repeated output-schema failure; selection bias remains.",
+    "Original failed query remains zero in sealed 300-query results.",
+    "No additional inference, embedding or retrieval was used for this subset arithmetic.",
+    "Costs conservatively treat all reported prompt tokens as cache misses; unresolved SSL outcome remains fully reserved."
+  ],
+  "source_hashes": {
+    "sealed_results_sha256": "55f9633de3eea5af211911051a6d244a9d2713cbea948d5a6570835c8ccbe52c",
+    "frozen_payloads_sha256": "952ebb5c023862ba34f058585377629e6ac8bd7f31f46802e585d4bbf3e8889e",
+    "qrels_sha256": "0864bb985e0ca2367ba217977e72004d549054b2b06666ed9d4825ac7c21284c",
+    "diagnostic_payload_sha256": "37d4901a8fb1a322e3cc4a9810da7a797493ce88eb715d44f8f2cc5b17e4dc85",
+    "diagnostic_response_sha256": "841103d496fbe97a2aef16a502dfa31e9924915df8eb2443c5186098d586ec8d",
+    "diagnostic_ledger_sha256": "7e241e7c180bbb9f58d9ec0aa8c1ecf15a8f8b3fd72174c72183066d05a878d7"
+  }
+}

@@ -376,6 +376,8 @@ npm run build
 
 第一阶段的离线故障验证、40 题证据审阅流程及三组检索评测入口见 [RAG 评测说明](test/RAG_EVALUATION.md)。旧 `test/gold.txt` 是未审定的自动候选标签，不能作为可信效果成绩。
 
+已有三组原始导出可用 [离线 RAG 实验归档](test/RAG_EXPERIMENTS.md) 生成文件哈希清单、逐题配对变化、失败复盘与中文报告，并通过 `rag_experiment.py verify` 重算校验内部一致性。该工具输入只读、拒绝覆盖旧目录，不运行模型或数据库；fixture 始终显著标记，成本缺失保留未知，归档不代表新增真实效果结论。
+
 九项合成故障契约的固定版本对照为 0/9 → 8/9 → 9/9，原始日志已保留；该结果仅验证失败/取消传播，**不是 RAG 准确率提升**。40 题仍全部待人工审阅。双人盲审候选池、分歧门禁及失败复盘导出可通过 `test/rag_review.py` 运行；离线指标与审阅工具测试使用 `python -m unittest discover -s test -p 'test_rag*.py' -v`。
 
 当前可用：

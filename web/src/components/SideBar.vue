@@ -3,7 +3,7 @@
     <div class="sidebar-logo">
       <div class="logo-mark">◈</div>
       <div>
-        <div class="logo-name">AGI-saber</div>
+        <div class="logo-name">KnowFlow</div>
         <div class="logo-sub">智能协作 · 一站直达</div>
       </div>
     </div>

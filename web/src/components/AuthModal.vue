@@ -1,7 +1,7 @@
 <template>
   <div class="auth-overlay show">
     <div class="auth-card">
-      <div class="auth-title">AGI-saber</div>
+      <div class="auth-title">KnowFlow</div>
       <div class="auth-sub">{{ auth.mode === 'login' ? '登录以使用专属记忆' : '创建一个新账号' }}</div>
 
       <div class="auth-tabs">

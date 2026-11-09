@@ -1,6 +1,6 @@
 # Architecture Documentation Index
 
-This file serves as a quick reference to the complete architectural analysis of the KnowFlow codebase.
+This file preserves the June 2026 architecture review of KnowFlow. Package names, line counts and test counts below describe that historical snapshot. For the current entry point and layout, use the [project README](../../README.md).
 
 ## 📖 Documents (Read in This Order)
 
@@ -207,7 +207,7 @@ Layer 6: main.go           — Application entry point
 ## 💾 Files in This Package
 
 ```
-/Users/yangshujie/AGI-assistant/
+KnowFlow/
 ├── ARCHITECTURE_DOCS_INDEX.md      ← You are here
 ├── ARCHITECTURE_README.md          ← Navigation guide (START HERE)
 ├── ARCHITECTURE_MAP.md             ← Detailed package inventory
@@ -259,10 +259,10 @@ Layer 6: main.go           — Application entry point
 
 ## 🔗 Related Resources
 
-- **Original README**: `/Users/yangshujie/AGI-assistant/README.md`
-- **Source code**: `/Users/yangshujie/AGI-assistant/internal/`
-- **Configuration**: `/Users/yangshujie/AGI-assistant/config/`
-- **Main entry**: `/Users/yangshujie/AGI-assistant/main.go`
+- **Current README**: [README.md](../../README.md)
+- **Source code**: [internal/](../../internal/)
+- **Configuration**: [config/](../../config/)
+- **Current entry point**: [cmd/server/main.go](../../cmd/server/main.go)
 
 ---
 

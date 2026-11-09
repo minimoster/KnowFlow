@@ -1,6 +1,8 @@
 # KnowFlow — 技术知识库与办公 Agent
 
-agi时代的个人办公智能助手
+面向技术知识检索、记忆管理与办公任务的 Agent 原型。
+
+本仓库由原名 `agi-saber` 统一命名为 KnowFlow。`main` 是当前 Go + Vue 实现；`python`、`java` 是独立的历史实现分支，功能与测试结果不能直接混用。备份和实验分支保留各自版本，不代表已合入主分支。
 
 后端是 `cmd/server/main.go`，提供认证、SSE 对话、知识库、记忆、工具、Skill、文档库和状态接口；前端在 `web/`，使用 Vite + Vue 3 + Pinia。后端不再托管前端静态文件，开发时分别启动。
 
@@ -325,6 +327,8 @@ Milvus 保存向量索引，Elasticsearch 保存 BM25 索引，Neo4j 保存知�
 | `skillhub.keyword` | GitHub 搜索关键词，多词是 AND |
 
 ## 部署说明
+
+默认 Compose 仅用于受控的本地开发，包含公开演示密码和未启用鉴权的服务。不要原样部署到公网；公开服务前请先阅读[部署安全检查](docs/deployment-safety.md)。
 
 后端 Dockerfile 只打包 Go API。前端需要独立构建并由 nginx 或静态服务器托管：
 

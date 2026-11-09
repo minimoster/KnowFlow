@@ -2,7 +2,7 @@
   <div class="msg-row" :class="msg.role">
     <div class="avatar" :class="msg.role">{{ msg.role === 'user' ? '◇' : '◈' }}</div>
     <div class="msg-body">
-      <div class="msg-name">{{ msg.role === 'user' ? '你' : 'AGI-saber' }}</div>
+      <div class="msg-name">{{ msg.role === 'user' ? '你' : 'KnowFlow' }}</div>
 
       <!-- 用户消息：纯文本 -->
       <div v-if="msg.role === 'user'" class="bubble user">{{ msg.text }}</div>

@@ -1,4 +1,4 @@
-# AGI-saber 前端 nginx 部署示例（独立端口，前后端分离）
+# KnowFlow 前端 nginx 部署示例（独立端口，前后端分离）
 # 用法：
 #   1) npm run build 产出 web/dist
 #   2) 把 dist 部署到下方 root 路径

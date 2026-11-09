@@ -10,6 +10,8 @@
 
 ---
 
+> 历史实施计划，保留设计与验证步骤。文中的 pytest 命令在 `final/` 目录执行，并使用已安装本分支依赖的 Python 环境。
+
 ## 文件结构
 
 - 新增 `final/internal/document/__init__.py`：导出文档领域类型和解析函数。
@@ -74,7 +76,7 @@ def test_new_id_uses_prefix():
 
 - [ ] **Step 2: 确认测试失败**
 
-Run: `/Users/lby/Documents/trae_projects/py_projiet/venv/bin/python -m pytest tests/test_document_library.py -v`
+Run: `python -m pytest tests/test_document_library.py -v`
 
 Expected: `ModuleNotFoundError: No module named 'internal.document'`
 
@@ -84,7 +86,7 @@ Expected: `ModuleNotFoundError: No module named 'internal.document'`
 
 - [ ] **Step 4: 跑测试**
 
-Run: `/Users/lby/Documents/trae_projects/py_projiet/venv/bin/python -m pytest tests/test_document_library.py -v`
+Run: `python -m pytest tests/test_document_library.py -v`
 
 Expected: pass
 
@@ -130,7 +132,7 @@ def test_parse_empty_text_rejects_document():
 
 - [ ] **Step 2: 确认测试失败**
 
-Run: `/Users/lby/Documents/trae_projects/py_projiet/venv/bin/python -m pytest tests/test_document_parser.py -v`
+Run: `python -m pytest tests/test_document_parser.py -v`
 
 Expected: import/function missing failure
 
@@ -140,7 +142,7 @@ Expected: import/function missing failure
 
 - [ ] **Step 4: 跑测试**
 
-Run: `/Users/lby/Documents/trae_projects/py_projiet/venv/bin/python -m pytest tests/test_document_parser.py -v`
+Run: `python -m pytest tests/test_document_parser.py -v`
 
 Expected: pass
 
@@ -190,7 +192,7 @@ def test_document_repo_write_validates_content():
 
 - [ ] **Step 2: 确认测试失败**
 
-Run: `/Users/lby/Documents/trae_projects/py_projiet/venv/bin/python -m pytest tests/test_document_repo.py -v`
+Run: `python -m pytest tests/test_document_repo.py -v`
 
 Expected: module missing failure
 
@@ -200,7 +202,7 @@ Expected: module missing failure
 
 - [ ] **Step 4: 跑测试**
 
-Run: `/Users/lby/Documents/trae_projects/py_projiet/venv/bin/python -m pytest tests/test_document_repo.py -v`
+Run: `python -m pytest tests/test_document_repo.py -v`
 
 Expected: pass
 
@@ -243,7 +245,7 @@ def test_agent_registers_document_tools():
 
 - [ ] **Step 2: 确认测试失败**
 
-Run: `/Users/lby/Documents/trae_projects/py_projiet/venv/bin/python -m pytest tests/test_document_tools.py -v`
+Run: `python -m pytest tests/test_document_tools.py -v`
 
 Expected: `_register_document_tools` missing
 
@@ -253,7 +255,7 @@ Expected: `_register_document_tools` missing
 
 - [ ] **Step 4: 跑测试**
 
-Run: `/Users/lby/Documents/trae_projects/py_projiet/venv/bin/python -m pytest tests/test_document_tools.py -v`
+Run: `python -m pytest tests/test_document_tools.py -v`
 
 Expected: pass
 
@@ -287,7 +289,7 @@ def test_upload_returns_main_document_fields(client):
 
 - [ ] **Step 2: 确认测试失败**
 
-Run: `/Users/lby/Documents/trae_projects/py_projiet/venv/bin/python -m pytest tests/test_document_api.py tests/test_frontend_main_alignment.py -v`
+Run: `python -m pytest tests/test_document_api.py tests/test_frontend_main_alignment.py -v`
 
 Expected: missing fields/routes
 
@@ -304,7 +306,7 @@ Expected: missing fields/routes
 
 - [ ] **Step 4: 跑测试**
 
-Run: `/Users/lby/Documents/trae_projects/py_projiet/venv/bin/python -m pytest tests/test_document_api.py tests/test_frontend_main_alignment.py -v`
+Run: `python -m pytest tests/test_document_api.py tests/test_frontend_main_alignment.py -v`
 
 Expected: pass
 
@@ -347,7 +349,7 @@ def test_doc_agent_writes_document(agent_shell):
 
 - [ ] **Step 2: 确认测试失败**
 
-Run: `/Users/lby/Documents/trae_projects/py_projiet/venv/bin/python -m pytest tests/test_subagents.py tests/test_graph_runtime.py -v`
+Run: `python -m pytest tests/test_subagents.py tests/test_graph_runtime.py -v`
 
 Expected: subagents module missing
 
@@ -361,7 +363,7 @@ Expected: subagents module missing
 
 - [ ] **Step 5: 跑测试**
 
-Run: `/Users/lby/Documents/trae_projects/py_projiet/venv/bin/python -m pytest tests/test_subagents.py tests/test_graph_runtime.py -v`
+Run: `python -m pytest tests/test_subagents.py tests/test_graph_runtime.py -v`
 
 Expected: pass
 
@@ -393,7 +395,7 @@ def test_frontend_contains_document_library_endpoints():
 
 - [ ] **Step 2: 确认测试失败**
 
-Run: `/Users/lby/Documents/trae_projects/py_projiet/venv/bin/python -m pytest tests/test_frontend_main_alignment.py -v`
+Run: `python -m pytest tests/test_frontend_main_alignment.py -v`
 
 Expected: assertions fail
 
@@ -403,7 +405,7 @@ Expected: assertions fail
 
 - [ ] **Step 4: 跑测试**
 
-Run: `/Users/lby/Documents/trae_projects/py_projiet/venv/bin/python -m pytest tests/test_frontend_main_alignment.py -v`
+Run: `python -m pytest tests/test_frontend_main_alignment.py -v`
 
 Expected: pass
 
@@ -424,7 +426,7 @@ git commit -m "feat: align document library frontend"
 Run:
 
 ```bash
-/Users/lby/Documents/trae_projects/py_projiet/venv/bin/python -m pytest \
+python -m pytest \
   tests/test_document_library.py \
   tests/test_document_parser.py \
   tests/test_document_repo.py \
@@ -442,7 +444,7 @@ Expected: pass
 停止旧 8090 进程后运行：
 
 ```bash
-/Users/lby/Documents/trae_projects/py_projiet/venv/bin/python main.py
+python main.py
 ```
 
 Expected: 启动日志显示 PostgreSQL/Elasticsearch/Neo4j 连接状态，FastAPI 监听 8090。

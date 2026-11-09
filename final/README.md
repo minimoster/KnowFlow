@@ -1,7 +1,8 @@
-# AGI Assistant · 新同学启动指南
+# KnowFlow Python · 启动指南
 
 一份"从 git clone 到看到首页"的最短路径。读完按步骤操作即可启动。
 
+> 本分支保留 KnowFlow 的历史 Python 实现，与当前 Go 主分支独立演进。
 > 项目位置：本仓库的 `python` 分支，代码在 `final/` 目录下。
 > 后端：FastAPI + Uvicorn（端口 **8090**）；前端：单页 HTML，由后端静态挂载在 `/`。
 
@@ -23,8 +24,8 @@
 ## 1. 拉代码 & 切到 python 分支
 
 ```bash
-git clone git@github.com:AGI-Core/AGI-saber.git
-cd AGI-saber
+git clone --branch python https://github.com/minimoster/KnowFlow.git
+cd KnowFlow
 git checkout python
 cd final
 ```

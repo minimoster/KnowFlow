@@ -1,7 +1,9 @@
 
-# AGI-assistant：多模态智能体系统
+# KnowFlow · Python 历史实现
 
-AGI-assistant 是一个面向个人与企业的多模态智能体系统，融合了检索增强生成（RAG）、三层记忆、知识图谱、沙箱执行与可恢复执行流，支持多轮对话、知识检索、工具调用与复杂推理。系统具备高可用性、可扩展性与工程落地能力。
+KnowFlow 的本分支是一个多模态智能体原型，融合了检索增强生成（RAG）、三层记忆、知识图谱、沙箱执行与可恢复执行流，支持多轮对话、知识检索、工具调用与复杂推理。功能以本分支代码和测试为准，未在此声明生产级可靠性。
+
+> 当前 Go + Vue 实现见 [main 分支](https://github.com/minimoster/KnowFlow/tree/main)。本分支启动方法见 [Python 启动指南](final/README.md)，能力说明见 [项目概览](final/PROJECT_OVERVIEW.md)。
 
 ## 项目特性
 
